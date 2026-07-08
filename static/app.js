@@ -83,6 +83,23 @@ async function sendNotification(title, body) {
 
 // ─── Init ────────────────────────────────────────────────────
 
+// Service Worker sofort aktualisieren, falls neue Version wartet
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/static/sw.js').then((reg) => {
+        if (reg.waiting) {
+            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
+        reg.addEventListener('updatefound', () => {
+            const newWorker = reg.installing;
+            newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    newWorker.postMessage({ type: 'SKIP_WAITING' });
+                }
+            });
+        });
+    });
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     applyTheme(localStorage.getItem('grot2buy_theme') || 'auto');
     updateDarkModeBtn();
@@ -184,7 +201,7 @@ function switchTab(tab, btn) {
 
 async function loadItems() {
     const content = document.getElementById('content');
-    content.innerHTML = '<div class="loading"><div class="spinner"></div><p>' + __('loading.data') + '</p></div>';
+    content.innerHTML = '<div class="loading"><div class="spinner"><div class="spinner-dot"></div><div class="spinner-dot"></div><div class="spinner-dot"></div><div class="spinner-dot"></div><div class="spinner-dot"></div><div class="spinner-dot"></div><div class="spinner-dot"></div></div><p>' + __('loading.data') + '</p></div>';
 
     try {
         let data;

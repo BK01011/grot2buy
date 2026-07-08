@@ -4,20 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Grot2Buy</title>
-    <link rel="stylesheet" href="/static/style.css?v=5">
-    <link rel="icon" href="/static/logo.svg?v=5" type="image/svg+xml">
+    <link rel="stylesheet" href="/static/style.css?v=6">
+    <link rel="icon" href="/static/logo.svg?v=6" type="image/svg+xml">
     <link rel="manifest" href="/static/manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Grot2Buy">
-    <link rel="apple-touch-icon" href="/static/logo.svg?v=5">
+    <link rel="apple-touch-icon" href="/static/logo.svg?v=6">
 </head>
 <body>
     <div class="app">
         <!-- Header -->
         <header class="header">
             <div class="header-left">
-                <img src="/static/logo.svg?v=5" alt="Grot2Buy" class="header-logo">
+                <img src="/static/logo.svg?v=6" alt="Grot2Buy" class="header-logo">
                 <h1>{{ t("header.title") }}</h1>
                 <span class="item-count" id="itemCount">0</span>
             </div>
@@ -29,10 +29,10 @@
                     </svg>
                 </button>
                 <button class="btn-icon" onclick="openHelp()" title="{{ t('header.help') }}">
-                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="12" cy="12" r="10"/>
-                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
-                        <line x1="12" y1="17" x2="12.01" y2="17"/>
+                        <path d="M9.5 9.5a2.8 2.8 0 0 1 5 0c0 2.2-2.5 3-2.5 4.5"/>
+                        <circle cx="12" cy="17" r="0.8" fill="currentColor" stroke="none"/>
                     </svg>
                 </button>
                 <button class="btn-icon" id="darkModeBtn" onclick="toggleDarkMode()" title="{{ t('header.darkmode') }}">
@@ -203,6 +203,7 @@
                         <li>{{ t("help.usage_remove") }}</li>
                         <li>{{ t("help.usage_sync") }}</li>
                         <li>{{ t("help.usage_dark") }}</li>
+                        <li>{{ t("help.usage_pwa") }}</li>
                     </ul>
                 </div>
                 <div class="help-section">

@@ -150,9 +150,10 @@
     "usage_buy": "✓ Artikel kaufen: Häkchen links am Artikel",
     "usage_qty": "➕/➖ Menge ändern: Buttons am Artikel",
     "usage_remove": "✕ Artikel entfernen: X-Button rechts",
-    "usage_sync": "🔄 Synchronisieren: Sync-Button oben rechts",
+    "usage_sync": "🔄 Synchronisieren: Automatisch beim Start — Sync-Button für manuelles Re-Sync",
     "usage_dark": "🌗 Dark Mode: Sonne/Mond-Icon oben rechts",
-    "credits_title": "Danksagungen",
+    "usage_pwa": "📲 PWA: Nach Update App schließen (vom Homescreen wegwischen) und neu öffnen",
+    
     "credits_author": "Autor: S.B.",
     "credits_ai": "Erstellt mit KI-Unterstützung (opencode, Claude)",
     "credits_thanks": "Dank an: Grocy, Buy Me a Pie",

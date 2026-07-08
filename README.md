@@ -8,8 +8,12 @@ Grot2Buy merges your shopping list services into one central list and keeps them
 ## Features
 
 - **Bidirectional Sync** – Grocy ↔ Grot2Buy ↔ Buy Me a Pie
-- **Auto-Sync** – Configurable interval (web UI)
+- **Auto-Sync on load** – Data appears immediately, no manual sync needed
+- **Auto-Sync (background)** – Configurable interval (web UI)
 - **PWA** – Installable on iOS/Android homescreen (fullscreen mode)
+- **Dark Mode** – Auto/Dark/Light toggle with system preference detection
+- **Push Notifications** – Desktop notifications on sync errors
+- **Knight Rider Spinner** – Retro-style loading animation
 - **Web-UI** – Responsive, mobile-optimized
 - **i18n** – German & English, easy to extend
 - **Setup Wizard** – Initial setup via browser
@@ -83,7 +87,7 @@ Full API documentation: [DOKU.md](DOKU.md)
 ## Tech Stack
 
 - **Backend:** Python 3.12, FastAPI, Uvicorn
-- **Frontend:** Vanilla JS, CSS3 (no framework)
+- **Frontend:** Vanilla JS, CSS3 (no framework), Service Worker (Network‑First)
 - **Encryption:** Fernet (AES-256-CBC)
 - **Auth:** PBKDF2-SHA256 + Bearer Token
 - **Container:** Docker + Compose, Health-Check
@@ -128,8 +132,12 @@ Grot2Buy führt deine Einkaufslisten-Dienste in einer zentralen Liste zusammen u
 ## Features
 
 - **Bidirektionaler Sync** – Grocy ↔ Grot2Buy ↔ Buy Me a Pie
-- **Auto-Sync** – Konfigurierbares Intervall (Web-UI)
+- **Auto-Sync beim Start** – Daten erscheinen sofort, kein manueller Sync nötig
+- **Auto-Sync (Hintergrund)** – Konfigurierbares Intervall (Web-UI)
 - **PWA** – Installierbar auf iOS/Android-Homescreen (Vollbildmodus)
+- **Dark Mode** – Auto/Dunkel/Hell mit System-Erkennung
+- **Push-Benachrichtigungen** – Desktop-Meldungen bei Sync-Fehlern
+- **Knight Rider Spinner** – Retro-Ladeanimation
 - **Web-UI** – Responsiv, mobil-optimiert
 - **Mehrsprachig** – Deutsch & Englisch, einfach erweiterbar
 - **Setup-Wizard** – Ersteinrichtung via Browser
@@ -203,7 +211,7 @@ Vollständige API-Dokumentation: [DOKU.md](DOKU.md)
 ## Technik
 
 - **Backend:** Python 3.12, FastAPI, Uvicorn
-- **Frontend:** Vanilla JS, CSS3 (kein Framework)
+- **Frontend:** Vanilla JS, CSS3 (kein Framework), Service Worker (Network‑First)
 - **Verschlüsselung:** Fernet (AES-256-CBC)
 - **Authentifizierung:** PBKDF2-SHA256 + Bearer Token
 - **Container:** Docker + Compose, Health-Check

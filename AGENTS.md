@@ -1,4 +1,4 @@
-# Grot2Buy v0.2.4
+# Grot2Buy v0.4.2
 
 Bidirektionale Synchronisation zwischen Buy Me a Pie, Grocy und lokaler Einkaufsliste.
 Architektur: Zentrale Liste (synced_items) als Wahrheitsquelle, **wer geändert hat gewinnt** (statt "Grocy immer").
@@ -56,6 +56,7 @@ Sprache wird in `config["lang"]` gespeichert. Neue Sprache hinzufügen:
 
 ## Aktuelle Version
 
-`0.4.0` — Mehrsprachig (DE/EN, erweiterbar), Sprachauswahl in Einstellungen & Setup
+`0.4.2` — Auto-Sync beim Start, Dark Mode, Push-Benachrichtigungen,
+BAP-Client-Recycling, Timeouts, Knight-Rider-Ladespinner
 
 Autor: S.B. | Lizenz: MIT | Erstellt mit KI-Unterstützung (opencode, Claude)

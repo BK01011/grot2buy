@@ -1,11 +1,11 @@
-const CACHE = 'grot2buy-v4';
+const CACHE = 'grot2buy-v6';
 
 const PRECACHE = [
-  '/',
-  '/static/style.css?v=5',
-  '/static/app.js',
-  '/static/logo.svg?v=5',
-  '/static/manifest.json',
+  '/?sw=v6',
+  '/static/style.css?v=6',
+  '/static/app.js?v=6',
+  '/static/logo.svg?v=6',
+  '/static/manifest.json?v=6',
 ];
 
 self.addEventListener('install', (event) => {
@@ -27,11 +27,20 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   event.respondWith(
-    fetch(event.request).catch(() => caches.match(event.request))
+    fetch(event.request).then((response) => {
+      if (response.ok && /\.(css|js|svg|json)$/.test(event.request.url)) {
+        caches.open(CACHE).then((cache) => cache.put(event.request, response.clone()));
+      }
+      return response;
+    }).catch(() => caches.match(event.request))
   );
 });
 
 self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+    return;
+  }
   if (event.data?.type === 'show-notification') {
     self.registration.showNotification(event.data.title, {
       body: event.data.body,
