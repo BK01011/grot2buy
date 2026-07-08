@@ -57,6 +57,6 @@ Sprache wird in `config["lang"]` gespeichert. Neue Sprache hinzufügen:
 ## Aktuelle Version
 
 `0.4.2` — Auto-Sync beim Start, Dark Mode, Push-Benachrichtigungen,
-BAP-Client-Recycling, Timeouts, Knight-Rider-Ladespinner
+BAP-Client-Recycling, Timeouts
 
 Autor: S.B. | Lizenz: MIT | Erstellt mit KI-Unterstützung (opencode, Claude)

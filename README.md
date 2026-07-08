@@ -13,7 +13,6 @@ Grot2Buy merges your shopping list services into one central list and keeps them
 - **PWA** – Installable on iOS/Android homescreen (fullscreen mode)
 - **Dark Mode** – Auto/Dark/Light toggle with system preference detection
 - **Push Notifications** – Desktop notifications on sync errors
-- **Knight Rider Spinner** – Retro-style loading animation
 - **Web-UI** – Responsive, mobile-optimized
 - **i18n** – German & English, easy to extend
 - **Setup Wizard** – Initial setup via browser
@@ -137,7 +136,6 @@ Grot2Buy führt deine Einkaufslisten-Dienste in einer zentralen Liste zusammen u
 - **PWA** – Installierbar auf iOS/Android-Homescreen (Vollbildmodus)
 - **Dark Mode** – Auto/Dunkel/Hell mit System-Erkennung
 - **Push-Benachrichtigungen** – Desktop-Meldungen bei Sync-Fehlern
-- **Knight Rider Spinner** – Retro-Ladeanimation
 - **Web-UI** – Responsiv, mobil-optimiert
 - **Mehrsprachig** – Deutsch & Englisch, einfach erweiterbar
 - **Setup-Wizard** – Ersteinrichtung via Browser
