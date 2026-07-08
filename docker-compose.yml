@@ -1,0 +1,20 @@
+version: "3.8"
+
+services:
+  shopping-list:
+    build: .
+    container_name: shopping-list
+    restart: unless-stopped
+    ports:
+      - "8899:8899"
+    volumes:
+      - ./data:/app/data
+      - ./certs:/app/certs
+    environment:
+      - TZ=Europe/Berlin
+    healthcheck:
+      test: ["CMD", "curl", "-f", "https://localhost:8899/health", "--insecure"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

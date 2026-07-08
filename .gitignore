@@ -1,0 +1,37 @@
+# Grot2Buy — .gitignore
+
+# Sensitive data (keys, credentials, certs)
+data/
+certs/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Environment
+.env
+.env.local
+*.env
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# AI Assistant
+.opencode/
+opencode.json
+opencode.jsonc
+
+# Docker
+docker-compose.override.yml

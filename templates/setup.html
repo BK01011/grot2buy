@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Einrichtung — Grot2Buy</title>
+    <link rel="stylesheet" href="/static/style.css?v=2">
+    <link rel="icon" href="/static/logo.svg?v=2" type="image/svg+xml">
+    <style>
+        body { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); }
+        .setup-card { background: var(--surface); padding: 32px; border-radius: var(--radius); box-shadow: var(--shadow-lg); width: 100%; max-width: 480px; margin: 20px; }
+        .setup-card h1 { text-align: center; margin-bottom: 8px; font-size: 1.5rem; }
+        .setup-card p { text-align: center; color: var(--text-secondary); margin-bottom: 24px; font-size: 0.875rem; }
+        .setup-section { margin-bottom: 24px; padding: 16px; background: var(--background); border-radius: var(--radius); }
+        .setup-section h3 { margin: 0 0 12px 0; font-size: 1rem; color: var(--text); }
+        .setup-section .hint { font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 12px; }
+        .setup-section .optional { display: inline-block; background: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; margin-left: 8px; }
+        .step-indicator { display: flex; justify-content: center; gap: 8px; margin-bottom: 24px; }
+        .step { width: 10px; height: 10px; border-radius: 50%; background: #d1d5db; }
+        .step.active { background: #3b82f6; }
+        .step.completed { background: #10b981; }
+    </style>
+</head>
+<body>
+    <div class="setup-card">
+        <h1><img src="/static/logo.svg?v=2" alt="Grot2Buy" style="height: 48px; vertical-align: middle; margin-right: 8px;">Grot2Buy</h1>
+        <p>Willkommen! Richte dein Einkaufslisten-System ein.</p>
+        
+        <div class="step-indicator">
+            <div class="step active" id="step1"></div>
+            <div class="step" id="step2"></div>
+            <div class="step" id="step3"></div>
+        </div>
+
+        <form method="POST" action="/setup">
+            <!-- Schritt 1: Buy Me a Pie -->
+            <div class="setup-section" id="section1">
+                <h3>📱 Buy Me a Pie <span class="optional">Optional</span></h3>
+                <p class="hint">Verbinde dich mit deiner Einkaufslisten-App</p>
+                <div class="input-group">
+                    <label>E-Mail-Adresse</label>
+                    <input type="email" name="bap_user" placeholder="name@beispiel.de">
+                </div>
+                <div class="input-group">
+                    <label>Passwort</label>
+                    <input type="password" name="bap_pass" placeholder="BAP-Passwort">
+                </div>
+            </div>
+
+            <!-- Schritt 2: Grocy -->
+            <div class="setup-section" id="section2">
+                <h3>📦 Grocy <span class="optional">Optional</span></h3>
+                <p class="hint">Verbinde dich mit deinem Bestandsverwaltungssystem</p>
+                <div class="input-group">
+                    <label>Server-URL</label>
+                    <input type="url" name="grocy_url" placeholder="http://192.168.178.154:32772">
+                </div>
+                <div class="input-group">
+                    <label>API-Key</label>
+                    <input type="text" name="grocy_key" placeholder="Dein Grocy API-Key">
+                </div>
+            </div>
+
+            <!-- Schritt 3: Passwort -->
+            <div class="setup-section" id="section3">
+                <h3>🔒 Zugangsschutz <span class="optional">Optional</span></h3>
+                <p class="hint">Setze ein Passwort für die Web-UI</p>
+                <div class="input-group">
+                    <label>Passwort</label>
+                    <input type="password" name="password" placeholder="Passwort (leer = kein Login)">
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary full-width">Einrichtung abschließen</button>
+        </form>
+    </div>
+
+    <script>
+        // Automatische Weiterleitung wenn Setup bereits abgeschlossen
+        fetch('/api/config').then(r => r.json()).then(data => {
+            if (data.setup_complete) {
+                window.location.href = '/';
+            }
+        }).catch(() => {});
+    </script>
+</body>
+</html>

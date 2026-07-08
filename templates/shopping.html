@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grot2Buy — Einkaufsliste</title>
+    <link rel="stylesheet" href="/static/style.css?v=2">
+    <link rel="icon" href="/static/logo.svg?v=2" type="image/svg+xml">
+</head>
+<body>
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <img src="/static/logo.svg?v=2" alt="Grot2Buy" class="header-logo">
+                <h1>Grot2Buy</h1>
+                <span class="item-count" id="itemCount">0</span>
+            </div>
+            <div class="header-right">
+                <button class="btn-icon" onclick="syncWithBAP()" title="Synchronisieren" id="syncBtn">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
+                        <path d="M21 3v5h-5"/>
+                    </svg>
+                </button>
+                <button class="btn-icon" onclick="openSettings()" title="Einstellungen">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Tabs: Listen -->
+        <div class="tabs" id="listTabs">
+            <button class="tab active" data-list="synced" onclick="switchTab('synced', this)">📋 Synchronisiert</button>
+            <button class="tab" data-list="grocy" onclick="switchTab('grocy', this)">📦 Grocy</button>
+        </div>
+
+        <!-- Content -->
+        <main class="content" id="content">
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Lade Daten...</p>
+            </div>
+        </main>
+
+        <!-- FAB: Hinzufügen -->
+        <button class="fab" onclick="openAddModal()" title="Artikel hinzufügen">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+        </button>
+    </div>
+
+    <!-- Modal: Artikel hinzufügen -->
+    <div class="modal" id="addModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Artikel hinzufügen</h2>
+                <button class="btn-close" onclick="closeModal('addModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group">
+                    <input type="text" id="itemName" placeholder="Artikelname" autocomplete="off">
+                </div>
+                <div class="input-row">
+                    <div class="input-group small">
+                        <label>Menge</label>
+                        <div class="quantity-control">
+                            <button onclick="changeQuantity(-1)">-</button>
+                            <input type="number" id="itemQuantity" value="1" min="1" max="99">
+                            <button onclick="changeQuantity(1)">+</button>
+                        </div>
+                    </div>
+                    <div class="input-group small">
+                        <label>Kategorie</label>
+                        <select id="itemCategory">
+                            <option value="">Auto</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label>Ziel-Liste</label>
+                    <select id="itemList">
+                        <option value="synced">📋 Synchronisiert</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('addModal')">Abbrechen</button>
+                <button class="btn btn-primary" onclick="addItem()">Hinzufügen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Einstellungen -->
+    <div class="modal" id="settingsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>⚙️ Einstellungen</h2>
+                <button class="btn-close" onclick="closeModal('settingsModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-section">
+                    <h3>Buy Me a Pie</h3>
+                    <div class="input-group">
+                        <label>Benutzername</label>
+                        <input type="text" id="bapUser" placeholder="E-Mail">
+                    </div>
+                    <div class="input-group">
+                        <label>Passwort</label>
+                        <input type="password" id="bapPass" placeholder="Passwort">
+                    </div>
+                    <button class="btn btn-primary" onclick="saveBAPConfig()">Speichern</button>
+                </div>
+                <div class="settings-section">
+                    <h3>🔄 Auto-Sync</h3>
+                    <div class="input-group">
+                        <label>Intervall (Minuten)</label>
+                        <input type="number" id="syncInterval" min="0" max="1440" step="1" placeholder="5">
+                        <small style="color:#888;">0 = deaktiviert</small>
+                    </div>
+                    <button class="btn btn-primary" onclick="saveSyncInterval()">Speichern</button>
+                </div>
+                <div class="settings-section">
+                    <h3>Aktionen</h3>
+                    <button class="btn btn-secondary full-width" onclick="exportList()">📋 Liste exportieren</button>
+                    <button class="btn btn-danger full-width" onclick="clearPurchased()">🗑️ Erledigte löschen</button>
+                </div>
+                <div class="settings-section">
+                    <h3>📥 Dokumentation</h3>
+                    <button class="btn btn-secondary full-width" onclick="downloadFile('/api/docs/doku', 'DOKU.md')">DOKU.md herunterladen</button>
+                    <button class="btn btn-secondary full-width" onclick="downloadFile('/api/docs/changelog', 'CHANGELOG.md')">CHANGELOG.md herunterladen</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

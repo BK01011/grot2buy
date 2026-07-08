@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anmelden — Einkaufsliste</title>
+    <link rel="stylesheet" href="/static/style.css?v=2">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛒</text></svg>">
+    <style>
+        body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+        .login-card { background: var(--surface); padding: 32px; border-radius: var(--radius); box-shadow: var(--shadow-lg); width: 100%; max-width: 360px; margin: 20px; }
+        .login-card h1 { text-align: center; margin-bottom: 8px; font-size: 1.5rem; }
+        .login-card p { text-align: center; color: var(--text-secondary); margin-bottom: 24px; font-size: 0.875rem; }
+        .login-card .error { background: #fee2e2; color: var(--danger); padding: 10px; border-radius: 8px; margin-bottom: 16px; font-size: 0.875rem; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <h1>🛒 Einkaufsliste</h1>
+        <p>Melde dich an um fortzufahren</p>
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+        <form method="POST" action="/login">
+            <div class="input-group">
+                <input type="password" name="password" placeholder="Passwort" autofocus>
+            </div>
+            <button type="submit" class="btn btn-primary full-width">Anmelden</button>
+        </form>
+    </div>
+</body>
+</html>
