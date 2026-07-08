@@ -28,6 +28,13 @@
                         <path d="M21 3v5h-5"/>
                     </svg>
                 </button>
+                <button class="btn-icon" onclick="openHelp()" title="{{ t('header.help') }}">
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                        <line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                </button>
                 <button class="btn-icon" id="darkModeBtn" onclick="toggleDarkMode()" title="{{ t('header.darkmode') }}">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="5"/>
@@ -170,6 +177,40 @@
                     <h3>{{ t("settings.docs_section") }}</h3>
                     <button class="btn btn-secondary full-width" onclick="downloadFile('/api/docs/doku', 'DOKU.md')">{{ t("settings.docs_doku") }}</button>
                     <button class="btn btn-secondary full-width" onclick="downloadFile('/api/docs/changelog', 'CHANGELOG.md')">{{ t("settings.docs_changelog") }}</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Hilfe / Über -->
+    <div class="modal" id="helpModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>{{ t("help.title") }}</h2>
+                <button class="btn-close" onclick="closeModal('helpModal')">&times;</button>
+            </div>
+            <div class="modal-body help-body">
+                <div class="help-section">
+                    <h3>{{ t("help.about_title") }}</h3>
+                    <p>{{ t("help.about_text", version=version) }}</p>
+                </div>
+                <div class="help-section">
+                    <h3>{{ t("help.usage_title") }}</h3>
+                    <ul class="help-list">
+                        <li>{{ t("help.usage_add") }}</li>
+                        <li>{{ t("help.usage_buy") }}</li>
+                        <li>{{ t("help.usage_qty") }}</li>
+                        <li>{{ t("help.usage_remove") }}</li>
+                        <li>{{ t("help.usage_sync") }}</li>
+                        <li>{{ t("help.usage_dark") }}</li>
+                    </ul>
+                </div>
+                <div class="help-section">
+                    <h3>{{ t("help.credits_title") }}</h3>
+                    <p>{{ t("help.credits_author") }}</p>
+                    <p>{{ t("help.credits_ai") }}</p>
+                    <p>{{ t("help.credits_thanks") }}</p>
+                    <p class="help-license">{{ t("help.credits_license") }}</p>
                 </div>
             </div>
         </div>

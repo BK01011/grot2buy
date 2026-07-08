@@ -4,7 +4,8 @@
     "sync": "Synchronisieren",
     "settings": "Einstellungen",
     "add": "Artikel hinzufügen",
-    "darkmode": "Dark Mode umschalten"
+    "darkmode": "Dark Mode umschalten",
+    "help": "Hilfe"
   },
   "tab": {
     "synced": "📋 Synchronisiert",
@@ -139,5 +140,22 @@
     "sync_error_body": "HTTP {status} — Sync konnte nicht abgeschlossen werden",
     "connection_lost": "Verbindung verloren",
     "connection_lost_body": "Die Verbindung zum Server wurde unterbrochen"
+  },
+  "help": {
+    "title": "Hilfe & Über",
+    "about_title": "Über Grot2Buy",
+    "about_text": "Version {version} — Bidirektionale Synchronisation zwischen Buy Me a Pie, Grocy und lokaler Einkaufsliste.",
+    "usage_title": "Kurzanleitung",
+    "usage_add": "➕ Artikel hinzufügen: + Button unten rechts",
+    "usage_buy": "✓ Artikel kaufen: Häkchen links am Artikel",
+    "usage_qty": "➕/➖ Menge ändern: Buttons am Artikel",
+    "usage_remove": "✕ Artikel entfernen: X-Button rechts",
+    "usage_sync": "🔄 Synchronisieren: Sync-Button oben rechts",
+    "usage_dark": "🌗 Dark Mode: Sonne/Mond-Icon oben rechts",
+    "credits_title": "Danksagungen",
+    "credits_author": "Autor: S.B.",
+    "credits_ai": "Erstellt mit KI-Unterstützung (opencode, Claude)",
+    "credits_thanks": "Dank an: Grocy, Buy Me a Pie",
+    "credits_license": "Lizenz: MIT — Jeder darf nutzen, verändern und teilen."
   }
 }

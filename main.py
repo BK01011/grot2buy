@@ -50,6 +50,7 @@ def template_context(request: Request, extra: dict = None) -> dict:
         "lang": lang,
         "langs": AVAILABLE_LANGUAGES,
         "t_flat": i18n_flat(lang),
+        "version": VERSION,
     }
     if extra:
         ctx.update(extra)

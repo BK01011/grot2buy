@@ -490,6 +490,10 @@ async function setLanguage(lang) {
 
 // ─── Helpers ─────────────────────────────────────────────────
 
+function openHelp() {
+    document.getElementById('helpModal').classList.add('open');
+}
+
 function closeModal(id) {
     document.getElementById(id).classList.remove('open');
 }

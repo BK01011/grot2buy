@@ -601,6 +601,51 @@ body {
     box-shadow: 0 12px 28px rgba(6,182,212,0.4);
 }
 
+/* Help Modal */
+.help-body { padding-bottom: 32px; }
+
+.help-section { margin-bottom: 24px; }
+
+.help-section h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--text);
+}
+
+.help-section p {
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+
+.help-list {
+    list-style: none;
+    padding: 0;
+}
+
+.help-list li {
+    padding: 6px 0 6px 20px;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    position: relative;
+}
+
+.help-list li::before {
+    content: '→';
+    position: absolute;
+    left: 0;
+    color: var(--primary);
+}
+
+.help-license {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+    font-size: 0.8rem;
+}
+
 /* Responsive */
 @media (min-width: 601px) {
     .modal-content {
