@@ -4,6 +4,32 @@ Alle Änderungen an Grot2Buy mit Begründungen.
 
 ---
 
+## [0.3.0] — 2026-07-08
+
+### 🌍 Mehrsprachigkeit (i18n)
+
+Grot2Buy spricht jetzt Deutsch und Englisch – und ist bereit für weitere Sprachen.
+
+**Neu**:
+- `modules/i18n.py` – Übersetzungs-Modul mit Punkt-Notation, Cache und Variablen-Substitution
+- `i18n/de.json` – Deutsche UI-Strings (vollständig)
+- `i18n/en.json` – Englische UI-Strings (vollständig)
+- Sprachauswahl im Setup-Wizard (erster Schritt)
+- Sprachauswahl im Einstellungs-Menü (sofortiger Wechsel mit Neuladen)
+- `GET/POST /api/config/lang` – API-Endpunkte für Sprachsteuerung
+- `{{ t("key") }}` – Jinja2-Funktion in allen Templates
+- `__("key")` – JavaScript-Übersetzungsfunktion (eingebettet aus `window._t`)
+- Backend-API-Responses übersetzbar (später erweiterbar)
+
+**Neue Sprache hinzufügen** (z.B. Französisch):
+1. `i18n/fr.json` erstellen (nach de.json-Vorbild)
+2. `AVAILABLE_LANGUAGES` in `modules/i18n.py` ergänzen
+3. Fertig – kein Neustart der Code-Struktur nötig
+
+**Version**: `0.2.5` → `0.3.0`
+
+---
+
 ## [0.2.5] — 2026-07-08
 
 ### PWA (Progressive Web App)

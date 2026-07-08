@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="{{ lang }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Einrichtung — Grot2Buy</title>
+    <title>{{ t("setup.title") }}</title>
     <link rel="stylesheet" href="/static/style.css?v=2">
     <link rel="icon" href="/static/logo.svg?v=2" type="image/svg+xml">
     <link rel="manifest" href="/static/manifest.json">
@@ -29,8 +29,8 @@
 <body>
     <div class="setup-card">
         <h1><img src="/static/logo.svg?v=2" alt="Grot2Buy" style="height: 48px; vertical-align: middle; margin-right: 8px;">Grot2Buy</h1>
-        <p>Willkommen! Richte dein Einkaufslisten-System ein.</p>
-        
+        <p>{{ t("setup.welcome") }}</p>
+
         <div class="step-indicator">
             <div class="step active" id="step1"></div>
             <div class="step" id="step2"></div>
@@ -38,50 +38,62 @@
         </div>
 
         <form method="POST" action="/setup">
+            <!-- Language / Sprache -->
+            <div class="setup-section" id="section0">
+                <h3>{{ t("setup.lang_title") }}</h3>
+                <div class="input-group">
+                    <label>{{ t("setup.lang_label") }}</label>
+                    <select name="lang">
+                        {% for lc in langs %}
+                        <option value="{{ lc }}" {{ 'selected' if lang == lc else '' }}>{{ t("lang." + lc) }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
             <!-- Schritt 1: Buy Me a Pie -->
             <div class="setup-section" id="section1">
-                <h3>📱 Buy Me a Pie <span class="optional">Optional</span></h3>
-                <p class="hint">Verbinde dich mit deiner Einkaufslisten-App</p>
+                <h3>📱 {{ t("setup.step1_title") }} <span class="optional">{{ t("setup.step1_optional") }}</span></h3>
+                <p class="hint">{{ t("setup.step1_text") }}</p>
                 <div class="input-group">
-                    <label>E-Mail-Adresse</label>
-                    <input type="email" name="bap_user" placeholder="name@beispiel.de">
+                    <label>{{ t("setup.bap_email") }}</label>
+                    <input type="email" name="bap_user" placeholder="{{ t('setup.bap_email_placeholder') }}">
                 </div>
                 <div class="input-group">
-                    <label>Passwort</label>
-                    <input type="password" name="bap_pass" placeholder="BAP-Passwort">
+                    <label>{{ t("setup.bap_pass") }}</label>
+                    <input type="password" name="bap_pass" placeholder="{{ t('setup.bap_pass_placeholder') }}">
                 </div>
             </div>
 
             <!-- Schritt 2: Grocy -->
             <div class="setup-section" id="section2">
-                <h3>📦 Grocy <span class="optional">Optional</span></h3>
-                <p class="hint">Verbinde dich mit deinem Bestandsverwaltungssystem</p>
+                <h3>📦 {{ t("setup.step2_title") }} <span class="optional">{{ t("setup.step2_optional") }}</span></h3>
+                <p class="hint">{{ t("setup.step2_text") }}</p>
                 <div class="input-group">
-                    <label>Server-URL</label>
-                    <input type="url" name="grocy_url" placeholder="http://192.168.178.154:32772">
+                    <label>{{ t("setup.grocy_url") }}</label>
+                    <input type="url" name="grocy_url" placeholder="{{ t('setup.grocy_url_placeholder') }}">
                 </div>
                 <div class="input-group">
-                    <label>API-Key</label>
-                    <input type="text" name="grocy_key" placeholder="Dein Grocy API-Key">
+                    <label>{{ t("setup.grocy_key") }}</label>
+                    <input type="text" name="grocy_key" placeholder="{{ t('setup.grocy_key_placeholder') }}">
                 </div>
             </div>
 
             <!-- Schritt 3: Passwort -->
             <div class="setup-section" id="section3">
-                <h3>🔒 Zugangsschutz <span class="optional">Optional</span></h3>
-                <p class="hint">Setze ein Passwort für die Web-UI</p>
+                <h3>🔒 {{ t("setup.step3_title") }} <span class="optional">{{ t("setup.step3_optional") }}</span></h3>
+                <p class="hint">{{ t("setup.step3_text") }}</p>
                 <div class="input-group">
-                    <label>Passwort</label>
-                    <input type="password" name="password" placeholder="Passwort (leer = kein Login)">
+                    <label>{{ t("setup.password") }}</label>
+                    <input type="password" name="password" placeholder="{{ t('setup.password_placeholder') }}">
                 </div>
             </div>
 
-            <button type="submit" class="btn btn-primary full-width">Einrichtung abschließen</button>
+            <button type="submit" class="btn btn-primary full-width">{{ t("setup.submit") }}</button>
         </form>
     </div>
 
     <script>
-        // Automatische Weiterleitung wenn Setup bereits abgeschlossen
         fetch('/api/config').then(r => r.json()).then(data => {
             if (data.setup_complete) {
                 window.location.href = '/';

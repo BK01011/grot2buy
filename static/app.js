@@ -3,6 +3,18 @@ const API = '/api';
 let currentTab = 'synced';
 let categories = [];
 
+// Übersetzungs-Hilfe (wird aus window._t gespeist, das im Template gesetzt wird)
+function __(key, ...args) {
+    let msg = window._t?.[key];
+    if (msg === undefined) return key;
+    if (args.length === 1 && typeof args[0] === 'object' && args[0] !== null) {
+        for (const [k, v] of Object.entries(args[0])) {
+            msg = msg.split(`{${k}}`).join(v);
+        }
+    }
+    return msg;
+}
+
 // ─── Init ────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -40,9 +52,9 @@ async function downloadFile(url, filename) {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(a.href);
-        toast(`${filename} heruntergeladen`);
+        toast( __('download.success', {filename: filename}) );
     } catch (e) {
-        toast('Download fehlgeschlagen: ' + e.message);
+        toast( __('download.failed', {msg: e.message}) );
     }
 }
 
@@ -53,10 +65,10 @@ async function loadCategories() {
         const data = await api('/categories');
         categories = data.categories || [];
         const sel = document.getElementById('itemCategory');
-        sel.innerHTML = '<option value="">Auto</option>' +
+        sel.innerHTML = '<option value="">' + __('add_modal.category_auto') + '</option>' +
             categories.map(c => `<option value="${c}">${c}</option>`).join('');
     } catch (e) {
-        console.error('Kategorien laden fehlgeschlagen:', e);
+        console.error('Categories load failed:', e);
     }
 }
 
@@ -68,14 +80,14 @@ async function loadLists() {
         const tabs = document.getElementById('listTabs');
         const lists = data.lists || [];
 
-        let html = '<button class="tab active" data-list="synced" onclick="switchTab(\'synced\', this)">📋 Synchronisiert</button>';
-        html += '<button class="tab" data-list="grocy" onclick="switchTab(\'grocy\', this)">📦 Grocy</button>';
+        let html = '<button class="tab active" data-list="synced" onclick="switchTab(\'synced\', this)">' + __('tab.synced') + '</button>';
+        html += '<button class="tab" data-list="grocy" onclick="switchTab(\'grocy\', this)">' + __('tab.grocy') + '</button>';
         for (const list of lists) {
             html += `<button class="tab" data-list="${list.id}" onclick="switchTab('${list.id}', this)">${list.name} (${list.count})</button>`;
         }
         tabs.innerHTML = html;
     } catch (e) {
-        console.error('Listen laden fehlgeschlagen:', e);
+        console.error('Lists load failed:', e);
     }
 }
 
@@ -90,7 +102,7 @@ function switchTab(tab, btn) {
 
 async function loadItems() {
     const content = document.getElementById('content');
-    content.innerHTML = '<div class="loading"><div class="spinner"></div><p>Lade Daten...</p></div>';
+    content.innerHTML = '<div class="loading"><div class="spinner"></div><p>' + __('loading.data') + '</p></div>';
 
     try {
         let data;
@@ -105,7 +117,7 @@ async function loadItems() {
             renderBAPItems(data);
         }
     } catch (e) {
-        content.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><h3>Fehler beim Laden</h3><p>Bitte versuche es erneut.</p></div>';
+        content.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><h3>' + __('error.load_title') + '</h3><p>' + __('error.load_text') + '</p></div>';
     }
 }
 
@@ -117,7 +129,7 @@ function renderSyncedItems(data) {
     document.getElementById('itemCount').textContent = items.length;
 
     if (items.length === 0) {
-        content.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🛒</div><h3>Liste ist leer</h3><p>Füge Artikel mit dem + Button hinzu.</p></div>';
+        content.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🛒</div><h3>' + __('empty.synced_title') + '</h3><p>' + __('empty.synced_text') + '</p></div>';
         return;
     }
 
@@ -146,7 +158,7 @@ function renderBAPItems(data) {
     document.getElementById('itemCount').textContent = items.length;
 
     if (items.length === 0) {
-        content.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><h3>Liste ist leer</h3></div>';
+        content.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><h3>' + __('empty.bap_title') + '</h3></div>';
         return;
     }
 
@@ -164,7 +176,7 @@ function renderGrocyItems(data) {
     document.getElementById('itemCount').textContent = items.length;
 
     if (items.length === 0) {
-        content.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📦</div><h3>Grocy-Einkaufsliste ist leer</h3></div>';
+        content.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📦</div><h3>' + __('empty.grocy_title') + '</h3></div>';
         return;
     }
 
@@ -182,7 +194,7 @@ function renderGrocyItems(data) {
             `).join('')}
         </div>
         <div style="padding: 16px; text-align: center; color: #888; font-size: 13px;">
-            🔄 Bidirektional: Änderungen werden beim Sync automatisch synchronisiert
+            🔄 ${__('grocy.bidirectional')}
         </div>
     `;
 }
@@ -194,7 +206,7 @@ function renderItem(item) {
             <div class="item-check ${item.purchased ? 'checked' : ''}" onclick="togglePurchased('${escapeHtml(item.name)}')"></div>
             <div class="item-info">
                 <div class="item-name">${escapeHtml(item.name)}</div>
-                ${item.category ? `<div class="item-meta">${item.category}${item.barcode ? ' · ' + item.barcode : ''}</div>` : ''}
+                ${item.category ? `<div class="item-meta">${escapeHtml(item.category)}${item.barcode ? ' · ' + escapeHtml(item.barcode) : ''}</div>` : ''}
             </div>
             <div class="item-quantity">
                 <button class="qty-btn" onclick="changeItemQty('${escapeHtml(item.name)}', -1)">-</button>
@@ -234,7 +246,7 @@ async function togglePurchased(name) {
 }
 
 async function removeItem(name) {
-    if (!confirm(`"${name}" entfernen?`)) return;
+    if (!confirm( __('item.remove_confirm', {name: name}) )) return;
     const res = await api(`/items/${encodeURIComponent(name)}/remove`, { method: 'POST' });
     toast(res.result);
     loadItems();
@@ -249,7 +261,7 @@ async function changeItemQty(name, delta) {
         }
     });
     const newQty = Math.max(1, currentQty + delta);
-    const res = await api(`/items/${encodeURIComponent(name)}/quantity`, {
+    await api(`/items/${encodeURIComponent(name)}/quantity`, {
         method: 'POST',
         body: JSON.stringify({ quantity: newQty }),
     });
@@ -257,7 +269,7 @@ async function changeItemQty(name, delta) {
 }
 
 async function markBAPPurchased(listId, itemId) {
-    toast('Wird synchronisiert...');
+    toast(__('sync.start'));
     loadItems();
 }
 
@@ -273,7 +285,7 @@ function openAddModal() {
 
 async function loadListOptions() {
     const sel = document.getElementById('itemList');
-    sel.innerHTML = '<option value="synced">📋 Synchronisiert</option>';
+    sel.innerHTML = '<option value="synced">' + __('add_modal.target_synced') + '</option>';
     try {
         const data = await api('/lists');
         for (const list of (data.lists || [])) {
@@ -289,7 +301,7 @@ async function addItem() {
     const listId = document.getElementById('itemList').value;
 
     if (!name) {
-        toast('Bitte Namen eingeben');
+        toast( __('add_modal.name_required') );
         return;
     }
 
@@ -314,7 +326,7 @@ function changeQuantity(delta) {
 async function syncWithBAP() {
     const btn = document.getElementById('syncBtn');
     btn.classList.add('syncing');
-    toast('Synchronisiere...');
+    toast( __('sync.start') );
 
     try {
         const res = await api('/sync/full');
@@ -322,20 +334,20 @@ async function syncWithBAP() {
         await loadLists();
         await loadItems();
     } catch (e) {
-        toast('Sync fehlgeschlagen');
+        toast( __('sync.failed') );
     } finally {
         btn.classList.remove('syncing');
     }
 }
 
 async function pullFromGrocy() {
-    toast('Hole Artikel aus Grocy...');
+    toast( __('sync.pull_start') );
     try {
         const res = await api('/sync/grocy/pull');
         toast(res.result);
         await loadItems();
     } catch (e) {
-        toast('Fehler beim Holen aus Grocy');
+        toast( __('sync.pull_failed') );
     }
 }
 
@@ -378,15 +390,28 @@ async function exportList() {
     const data = await api('/export');
     if (data.export) {
         navigator.clipboard.writeText(data.export);
-        toast(`${data.count} Artikel in die Zwischenablage kopiert`);
+        toast( __('export.copied', {n: data.count}) );
     }
 }
 
 async function clearPurchased() {
-    if (!confirm('Alle erledigten Artikel löschen?')) return;
+    if (!confirm( __('item.clear_confirm') )) return;
     const res = await api('/items/clear-purchased', { method: 'POST' });
     toast(res.result);
     loadItems();
+}
+
+// ─── Language ────────────────────────────────────────────────
+
+async function setLanguage(lang) {
+    const res = await api('/config/lang', {
+        method: 'POST',
+        body: JSON.stringify({ lang }),
+    });
+    if (res.success) {
+        toast( __('lang.changed') );
+        setTimeout(() => location.reload(), 1000);
+    }
 }
 
 // ─── Helpers ─────────────────────────────────────────────────

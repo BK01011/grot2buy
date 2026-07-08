@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="{{ lang }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Anmelden — Einkaufsliste</title>
+    <title>{{ t("login.title") }}</title>
     <link rel="stylesheet" href="/static/style.css?v=2">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛒</text></svg>">
     <link rel="manifest" href="/static/manifest.json">
@@ -20,16 +20,16 @@
 </head>
 <body>
     <div class="login-card">
-        <h1>🛒 Einkaufsliste</h1>
-        <p>Melde dich an um fortzufahren</p>
+        <h1>{{ t("login.heading") }}</h1>
+        <p>{{ t("login.instruction") }}</p>
         {% if error %}
         <div class="error">{{ error }}</div>
         {% endif %}
         <form method="POST" action="/login">
             <div class="input-group">
-                <input type="password" name="password" placeholder="Passwort" autofocus>
+                <input type="password" name="password" placeholder="{{ t('login.password_placeholder') }}" autofocus>
             </div>
-            <button type="submit" class="btn btn-primary full-width">Anmelden</button>
+            <button type="submit" class="btn btn-primary full-width">{{ t("login.submit") }}</button>
         </form>
     </div>
     <script>if('serviceWorker'in navigator){navigator.serviceWorker.register('/static/sw.js')}</script>

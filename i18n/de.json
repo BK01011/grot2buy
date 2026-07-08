@@ -1,0 +1,131 @@
+{
+  "header": {
+    "title": "Grot2Buy",
+    "sync": "Synchronisieren",
+    "settings": "Einstellungen",
+    "add": "Artikel hinzufügen"
+  },
+  "tab": {
+    "synced": "📋 Synchronisiert",
+    "grocy": "📦 Grocy"
+  },
+  "loading": {
+    "data": "Lade Daten..."
+  },
+  "empty": {
+    "synced_title": "Liste ist leer",
+    "synced_text": "Füge Artikel mit dem + Button hinzu.",
+    "grocy_title": "Grocy-Einkaufsliste ist leer",
+    "bap_title": "Liste ist leer"
+  },
+  "error": {
+    "load_title": "Fehler beim Laden",
+    "load_text": "Bitte versuche es erneut."
+  },
+  "grocy": {
+    "bidirectional": "Bidirektional: Änderungen werden beim Sync automatisch synchronisiert"
+  },
+  "add_modal": {
+    "title": "Artikel hinzufügen",
+    "name_placeholder": "Artikelname",
+    "quantity": "Menge",
+    "category": "Kategorie",
+    "category_auto": "Auto",
+    "target_list": "Ziel-Liste",
+    "target_synced": "📋 Synchronisiert",
+    "cancel": "Abbrechen",
+    "add": "Hinzufügen",
+    "name_required": "Bitte Namen eingeben"
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "bap_section": "Buy Me a Pie",
+    "bap_user": "Benutzername",
+    "bap_user_placeholder": "E-Mail",
+    "bap_pass": "Passwort",
+    "bap_pass_placeholder": "Passwort",
+    "bap_save": "Speichern",
+    "sync_section": "Auto-Sync",
+    "sync_interval": "Intervall (Minuten)",
+    "sync_disabled": "0 = deaktiviert",
+    "sync_save": "Speichern",
+    "lang_section": "Sprache",
+    "lang_label": "Sprache",
+    "actions_section": "Aktionen",
+    "export": "Liste exportieren",
+    "clear_purchased": "Erledigte löschen",
+    "docs_section": "Dokumentation",
+    "docs_doku": "DOKU.md herunterladen",
+    "docs_changelog": "CHANGELOG.md herunterladen"
+  },
+  "item": {
+    "remove_confirm": "\"{name}\" entfernen?",
+    "removed": "✅ '{name}' entfernt.",
+    "added": "✅ '{name}' hinzugefügt.",
+    "not_found": "❌ '{name}' nicht gefunden.",
+    "purchased_marked": "✅ '{name}' als gekauft markiert.",
+    "updated": "Menge für '{name}' auf x{qty} aktualisiert.",
+    "clear_confirm": "Alle erledigten Artikel löschen?",
+    "clear_done": "Alle gekauften Artikel entfernt."
+  },
+  "sync": {
+    "start": "Synchronisiere...",
+    "success": "Sync erfolgreich.",
+    "failed": "Sync fehlgeschlagen",
+    "no_connection": "Keine Verbindung konfiguriert",
+    "pull_start": "Hole Artikel aus Grocy...",
+    "pull_success": "{n} Artikel aus Grocy geholt.",
+    "pull_failed": "Fehler beim Holen aus Grocy",
+    "autosync_enabled": "Auto-Sync: alle {minutes} Minuten",
+    "autosync_disabled": "Auto-Sync: deaktiviert"
+  },
+  "export": {
+    "copied": "{n} Artikel in die Zwischenablage kopiert"
+  },
+  "download": {
+    "success": "{filename} heruntergeladen",
+    "failed": "Download fehlgeschlagen: {msg}"
+  },
+  "setup": {
+    "title": "Einrichtung — Grot2Buy",
+    "welcome": "Willkommen! Richte dein Einkaufslisten-System ein.",
+    "lang_title": "Sprache / Language",
+    "lang_label": "Sprache",
+    "step1_title": "Buy Me a Pie",
+    "step1_text": "Verbinde dich mit deiner Einkaufslisten-App",
+    "step1_optional": "Optional",
+    "step2_title": "Grocy",
+    "step2_text": "Verbinde dich mit deinem Bestandsverwaltungssystem",
+    "step2_optional": "Optional",
+    "step3_title": "Zugangsschutz",
+    "step3_text": "Setze ein Passwort für die Web-UI",
+    "step3_optional": "Optional",
+    "bap_email": "E-Mail-Adresse",
+    "bap_email_placeholder": "name@beispiel.de",
+    "bap_pass": "Passwort",
+    "bap_pass_placeholder": "BAP-Passwort",
+    "grocy_url": "Server-URL",
+    "grocy_url_placeholder": "http://192.168.178.154:32772",
+    "grocy_key": "API-Key",
+    "grocy_key_placeholder": "Dein Grocy API-Key",
+    "password": "Passwort",
+    "password_placeholder": "Passwort (leer = kein Login)",
+    "submit": "Einrichtung abschließen"
+  },
+  "login": {
+    "title": "Anmelden — Einkaufsliste",
+    "heading": "Einkaufsliste",
+    "instruction": "Melde dich an um fortzufahren",
+    "password_placeholder": "Passwort",
+    "submit": "Anmelden",
+    "error": "Falsches Passwort"
+  },
+  "lang": {
+    "de": "Deutsch",
+    "en": "English",
+    "changed": "Sprache geändert. Lade Seite neu…"
+  },
+  "config": {
+    "bap_updated": "BAP-Zugangsdaten aktualisiert."
+  }
+}

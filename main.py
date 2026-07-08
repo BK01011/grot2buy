@@ -15,7 +15,7 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 from datetime import datetime
 
-VERSION = "0.2.5"
+VERSION = "0.3.0"
 
 # Logging
 logging.basicConfig(
@@ -36,9 +36,27 @@ from modules.config import config, DATA_DIR, encrypt
 from modules.shopping import shopping_manager
 from modules.shopping_sync import shopping_sync
 from modules.buymeapie import create_client
+from modules.i18n import t as i18n_t, flattened as i18n_flat, AVAILABLE_LANGUAGES
 
 BASE_DIR = Path(__file__).parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+
+
+def template_context(request: Request, extra: dict = None) -> dict:
+    """Liefert gemeinsame Template-Variablen inkl. Übersetzung."""
+    lang = config.get("lang", "de")
+    if lang not in AVAILABLE_LANGUAGES:
+        lang = "de"
+    ctx = {
+        "request": request,
+        "t": lambda key, **kw: i18n_t(key, lang, **kw),
+        "lang": lang,
+        "langs": AVAILABLE_LANGUAGES,
+        "t_flat": i18n_flat(lang),
+    }
+    if extra:
+        ctx.update(extra)
+    return ctx
 
 # Barcode-Kategorie-Zuordnung (EAN-Präfixe)
 BARCODE_CATEGORIES = {
@@ -174,7 +192,7 @@ async def index(request: Request, _: bool = Depends(verify_token)):
     # Bei Neuinstallation Setup-Seite anzeigen
     if not config.get("setup_complete", False):
         return RedirectResponse("/setup", status_code=303)
-    return templates.TemplateResponse(request, "shopping.html")
+    return templates.TemplateResponse(request, "shopping.html", template_context(request))
 
 
 @app.get("/setup", response_class=HTMLResponse)
@@ -182,7 +200,7 @@ async def setup_page(request: Request):
     # Bei abgeschlossenem Setup zur Hauptseite weiterleiten
     if config.get("setup_complete", False):
         return RedirectResponse("/", status_code=303)
-    return templates.TemplateResponse(request, "setup.html")
+    return templates.TemplateResponse(request, "setup.html", template_context(request))
 
 
 @app.get("/login", response_class=HTMLResponse)
@@ -190,7 +208,7 @@ async def login_page(request: Request):
     # Kein Passwort gesetzt → direkt weiterleiten
     if not config.get_decrypted("password", ""):
         return RedirectResponse("/", status_code=303)
-    return templates.TemplateResponse(request, "login.html")
+    return templates.TemplateResponse(request, "login.html", template_context(request))
 
 
 @app.post("/login")
@@ -202,9 +220,9 @@ async def login_submit(request: Request, password: str = Form("")):
         response = RedirectResponse("/", status_code=303)
         response.set_cookie("auth_token", token, httponly=True, secure=True, samesite="strict", max_age=86400 * 30)
         return response
-    return templates.TemplateResponse(request, "login.html", {
-        "error": "Falsches Passwort"
-    })
+    return templates.TemplateResponse(request, "login.html", template_context(request, {
+        "error": i18n_t("login.error", config.get("lang", "de"))
+    }))
 
 
 @app.get("/logout")
@@ -224,7 +242,9 @@ async def setup(
     bap_pass: str = Form(""),
     grocy_url: str = Form(""),
     grocy_key: str = Form(""),
+    lang: str = Form("de"),
 ):
+    config.set("lang", lang if lang in AVAILABLE_LANGUAGES else "de")
     config.set("password", hash_password(password) if password else "")
     config.set_encrypted("bap_user", bap_user)
     config.set_encrypted("bap_pass", bap_pass)
@@ -428,16 +448,20 @@ async def api_update_quantity(item_name: str, request: Request, _: bool = Depend
     body = await request.json()
     quantity = body.get("quantity", 1)
     shopping_sync.update_quantity(item_name, quantity)
+    lang = config.get("lang", "de")
+    msg = i18n_t("item.updated", lang, name=item_name, qty=str(quantity))
     logger.info(f"🔄 Menge aktualisiert: {item_name} → x{quantity}")
-    return JSONResponse({"result": f"Menge für '{item_name}' auf x{quantity} aktualisiert."})
+    return JSONResponse({"result": msg})
 
 
 @app.post("/api/items/clear-purchased")
 async def api_clear_purchased(_: bool = Depends(verify_token)):
     """Entfernt alle gekauften Artikel."""
     shopping_sync.clear_purchased()
+    lang = config.get("lang", "de")
+    msg = i18n_t("item.clear_done", lang)
     logger.info("🧹 Kaufte Artikel bereinigt")
-    return JSONResponse({"result": "Alle gekauften Artikel entfernt."})
+    return JSONResponse({"result": msg})
 
 
 # ─── API: BAP-Synchronisation ──────────────────────────────────
@@ -557,7 +581,8 @@ async def api_sync_grocy_pull(_: bool = Depends(verify_token)):
             if name:
                 shopping_sync.add_item(name, qty, "", source="grocy")
                 added += 1
-        result = f"✅ {added} Artikel aus Grocy geholt."
+        lang = config.get("lang", "de")
+        result = i18n_t("sync.pull_success", lang, n=str(added))
         logger.info(f"📥 Grocy-Pull: {result}")
         return JSONResponse({"result": result})
     except Exception as e:
@@ -618,6 +643,7 @@ async def api_config_get(_: bool = Depends(verify_token)):
         "bap_list_name": config.get("bap_list_name", "Einkaufsliste"),
         "has_password": bool(config.get_decrypted("password", "")),
         "sync_interval": config.get("sync_interval", 5),
+        "lang": config.get("lang", "de"),
     })
 
 
@@ -634,7 +660,8 @@ async def api_config_bap(request: Request, _: bool = Depends(verify_token)):
     if bap_user and bap_pass:
         shopping_manager.configure_buymeapie(bap_user, bap_pass)
 
-    return JSONResponse({"result": "BAP-Zugangsdaten aktualisiert."})
+    lang = config.get("lang", "de")
+    return JSONResponse({"result": i18n_t("config.bap_updated", lang)})
 
 
 @app.get("/api/config/sync-interval")
@@ -652,8 +679,32 @@ async def api_set_sync_interval(request: Request, _: bool = Depends(verify_token
     if not isinstance(interval, (int, float)) or interval < 0:
         return JSONResponse({"error": "Ungültiges Intervall"}, status_code=400)
     config.set("sync_interval", int(interval))
-    status = f"alle {interval} Minuten" if interval > 0 else "deaktiviert"
-    return JSONResponse({"result": f"Auto-Sync: {status}", "interval": int(interval)})
+    lang = config.get("lang", "de")
+    if interval > 0:
+        msg = i18n_t("sync.autosync_enabled", lang, minutes=str(int(interval)))
+    else:
+        msg = i18n_t("sync.autosync_disabled", lang)
+    return JSONResponse({"result": msg, "interval": int(interval)})
+
+
+@app.get("/api/config/lang")
+async def api_get_lang(_: bool = Depends(verify_token)):
+    """Gibt die aktuelle Sprache zurück."""
+    lang = config.get("lang", "de")
+    return JSONResponse({"lang": lang, "available": AVAILABLE_LANGUAGES})
+
+
+@app.post("/api/config/lang")
+async def api_set_lang(request: Request, _: bool = Depends(verify_token)):
+    """Setzt die Sprache."""
+    body = await request.json()
+    lang = body.get("lang", "de")
+    if lang not in AVAILABLE_LANGUAGES:
+        return JSONResponse({"success": False, "error": f"Unsupported language: {lang}"}, status_code=400)
+    config.set("lang", lang)
+    from modules.i18n import reload
+    reload()
+    return JSONResponse({"success": True, "lang": lang})
 
 
 @app.get("/api/config/export")

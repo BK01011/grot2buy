@@ -10,6 +10,7 @@ einer Quelle werden automatisch in die anderen propagiert – **wer geändert ha
 - **Bidirektionaler Sync** – Grocy ↔ Grot2Buy ↔ Buy Me a Pie
 - **Auto-Sync** – konfigurierbares Intervall (Web-UI)
 - **Web-UI** – responsive, mobil-optimiert
+- **Mehrsprachig** – Deutsch & Englisch, einfach erweiterbar
 - **Setup-Wizard** – Ersteinrichtung via Browser
 - **Docker** – Port 8899, HTTPS inklusive
 - **Verschlüsselt** – AES-256 (Fernet) für ruhende Daten

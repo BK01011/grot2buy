@@ -1,0 +1,131 @@
+{
+  "header": {
+    "title": "Grot2Buy",
+    "sync": "Synchronize",
+    "settings": "Settings",
+    "add": "Add item"
+  },
+  "tab": {
+    "synced": "📋 Synced",
+    "grocy": "📦 Grocy"
+  },
+  "loading": {
+    "data": "Loading data..."
+  },
+  "empty": {
+    "synced_title": "List is empty",
+    "synced_text": "Add items using the + button.",
+    "grocy_title": "Grocery shopping list is empty",
+    "bap_title": "List is empty"
+  },
+  "error": {
+    "load_title": "Error loading data",
+    "load_text": "Please try again."
+  },
+  "grocy": {
+    "bidirectional": "Bidirectional: changes are synced automatically"
+  },
+  "add_modal": {
+    "title": "Add item",
+    "name_placeholder": "Item name",
+    "quantity": "Quantity",
+    "category": "Category",
+    "category_auto": "Auto",
+    "target_list": "Target list",
+    "target_synced": "📋 Synced",
+    "cancel": "Cancel",
+    "add": "Add",
+    "name_required": "Please enter a name"
+  },
+  "settings": {
+    "title": "Settings",
+    "bap_section": "Buy Me a Pie",
+    "bap_user": "Username",
+    "bap_user_placeholder": "Email",
+    "bap_pass": "Password",
+    "bap_pass_placeholder": "Password",
+    "bap_save": "Save",
+    "sync_section": "Auto-Sync",
+    "sync_interval": "Interval (minutes)",
+    "sync_disabled": "0 = disabled",
+    "sync_save": "Save",
+    "lang_section": "Language",
+    "lang_label": "Language",
+    "actions_section": "Actions",
+    "export": "Export list",
+    "clear_purchased": "Clear purchased",
+    "docs_section": "Documentation",
+    "docs_doku": "Download DOKU.md",
+    "docs_changelog": "Download CHANGELOG.md"
+  },
+  "item": {
+    "remove_confirm": "Remove \"{name}\"?",
+    "removed": "✅ '{name}' removed.",
+    "added": "✅ '{name}' added.",
+    "not_found": "❌ '{name}' not found.",
+    "purchased_marked": "✅ '{name}' marked as purchased.",
+    "updated": "Quantity for '{name}' updated to x{qty}.",
+    "clear_confirm": "Delete all purchased items?",
+    "clear_done": "All purchased items removed."
+  },
+  "sync": {
+    "start": "Syncing...",
+    "success": "Sync successful.",
+    "failed": "Sync failed",
+    "no_connection": "No connection configured",
+    "pull_start": "Fetching items from Grocy...",
+    "pull_success": "{n} items fetched from Grocy.",
+    "pull_failed": "Error fetching from Grocy",
+    "autosync_enabled": "Auto-Sync: every {minutes} minutes",
+    "autosync_disabled": "Auto-Sync: disabled"
+  },
+  "export": {
+    "copied": "{n} items copied to clipboard"
+  },
+  "download": {
+    "success": "{filename} downloaded",
+    "failed": "Download failed: {msg}"
+  },
+  "setup": {
+    "title": "Setup — Grot2Buy",
+    "welcome": "Welcome! Set up your shopping list system.",
+    "lang_title": "Sprache / Language",
+    "lang_label": "Language",
+    "step1_title": "Buy Me a Pie",
+    "step1_text": "Connect to your shopping list app",
+    "step1_optional": "Optional",
+    "step2_title": "Grocy",
+    "step2_text": "Connect to your inventory management system",
+    "step2_optional": "Optional",
+    "step3_title": "Access protection",
+    "step3_text": "Set a password for the web UI",
+    "step3_optional": "Optional",
+    "bap_email": "Email address",
+    "bap_email_placeholder": "name@example.com",
+    "bap_pass": "Password",
+    "bap_pass_placeholder": "BAP password",
+    "grocy_url": "Server URL",
+    "grocy_url_placeholder": "http://192.168.178.154:32772",
+    "grocy_key": "API Key",
+    "grocy_key_placeholder": "Your Grocy API Key",
+    "password": "Password",
+    "password_placeholder": "Password (leave empty = no login)",
+    "submit": "Complete setup"
+  },
+  "login": {
+    "title": "Login — Shopping List",
+    "heading": "Shopping List",
+    "instruction": "Sign in to continue",
+    "password_placeholder": "Password",
+    "submit": "Sign in",
+    "error": "Wrong password"
+  },
+  "lang": {
+    "de": "Deutsch",
+    "en": "English",
+    "changed": "Language changed. Reloading…"
+  },
+  "config": {
+    "bap_updated": "BAP credentials updated."
+  }
+}

@@ -46,8 +46,16 @@ docker restart shopping-list
 2. **Stale BAP-Einträge**: Alte purchased-Duplikate in BAP (durch frühere Syncs erzeugt) werden jetzt alle gelöscht (`bap_purchased_all`).
 3. **Neue Items**: Erstmalig auftauchende Artikel werden nicht gegen die andere Quelle validiert → Quell-Status zählt.
 
+## i18n — Mehrsprachigkeit
+
+Sprache wird in `config["lang"]` gespeichert. Neue Sprache hinzufügen:
+
+1. `i18n/fr.json` erstellen (alle Keys aus de.json übersetzen)
+2. `AVAILABLE_LANGUAGES` in `modules/i18n.py` erweitern: `["de", "en", "fr"]`
+3. Neustarten
+
 ## Aktuelle Version
 
-`0.2.5` — PWA-Unterstützung (manifest, Service Worker, iOS Homescreen)
+`0.3.0` — Mehrsprachig (DE/EN, erweiterbar), Sprachauswahl in Einstellungen & Setup
 
 Autor: S.B. | Lizenz: MIT | Erstellt mit KI-Unterstützung (opencode, Claude)
