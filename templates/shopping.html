@@ -6,6 +6,11 @@
     <title>Grot2Buy — Einkaufsliste</title>
     <link rel="stylesheet" href="/static/style.css?v=2">
     <link rel="icon" href="/static/logo.svg?v=2" type="image/svg+xml">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Grot2Buy">
+    <link rel="apple-touch-icon" href="/static/logo.svg?v=2">
 </head>
 <body>
     <div class="app">
@@ -143,5 +148,6 @@
     <div class="toast" id="toast"></div>
 
     <script src="/static/app.js"></script>
+    <script>if('serviceWorker'in navigator){navigator.serviceWorker.register('/static/sw.js')}</script>
 </body>
 </html>

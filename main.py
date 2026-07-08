@@ -15,7 +15,7 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 from datetime import datetime
 
-VERSION = "0.2.4"
+VERSION = "0.2.5"
 
 # Logging
 logging.basicConfig(

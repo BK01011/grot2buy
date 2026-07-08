@@ -48,6 +48,6 @@ docker restart shopping-list
 
 ## Aktuelle Version
 
-`0.2.4` — UI aufgeräumt, Publikationsvorbereitung
+`0.2.5` — PWA-Unterstützung (manifest, Service Worker, iOS Homescreen)
 
 Autor: S.B. | Lizenz: MIT | Erstellt mit KI-Unterstützung (opencode, Claude)

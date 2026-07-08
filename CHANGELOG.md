@@ -4,6 +4,23 @@ Alle Änderungen an Grot2Buy mit Begründungen.
 
 ---
 
+## [0.2.5] — 2026-07-08
+
+### PWA (Progressive Web App)
+
+Grot2Buy ist jetzt als PWA installierbar – auf iOS zum HomeScreen hinzufügbar,
+läuft im Vollbildmodus ohne Browser-Chrome.
+
+**Neu**:
+- `static/manifest.json` – App-Name, Icons, Theme-Farben
+- `static/sw.js` – Service Worker (Cache-Fallback bei Netzwerkausfällen)
+- `apple-touch-icon`, `apple-mobile-web-app-capable` Meta-Tags
+- SW-Registration auf allen Seiten
+
+**Version**: `0.2.4` → `0.2.5`
+
+---
+
 ## [0.2.4] — 2026-07-08
 
 ### UI aufgeräumt + Publikationsvorbereitung
