@@ -22,29 +22,6 @@ Grot2Buy merges your shopping list services into one central list and keeps them
 
 ---
 
-## PWA — iOS / Android installieren
-
-**DE**
-1. Safari öffnen → `https://<deine-ip>:8899`
-2. **Teilen-Button** (Mitte der unteren Leiste)
-3. **"Zum Home-Bildschirm"** tippen
-4. Name bestätigen → **"Hinzufügen"**
-5. App-Icon erscheint auf dem Homescreen – wie eine native App
-
-**EN**
-1. Open Safari → `https://<your-ip>:8899`
-2. Tap the **Share button** (center of bottom bar)
-3. Scroll down → tap **"Add to Home Screen"**
-4. Confirm the name → tap **"Add"**
-5. The app icon appears on your homescreen – runs in fullscreen like a native app
-
-### Android
-
-Chrome zeigt beim ersten Besuch einen Install-Banner an (oder Menü → "Installieren").
-Chrome shows an install banner on first visit (or menu → "Install").
-
----
-
 ## Quick Start
 
 ```bash
@@ -78,6 +55,32 @@ All settings are managed through the web UI:
 | 2 | Buy Me a Pie (E-Mail + Passwort) | Buy Me a Pie (email + password) |
 | 3 | Grocy (Server-URL + API-Key) | Grocy (server URL + API key) |
 | 4 | Sync-Intervall (Standard 5 Minuten) | Sync interval (default 5 minutes) |
+
+---
+
+## PWA — iOS / Android installieren
+
+Sobald Grot2Buy läuft, kannst du es wie eine native App auf deinen Homescreen legen.
+Once Grot2Buy is running, you can add it to your homescreen like a native app.
+
+**DE**
+1. Safari öffnen → `https://<deine-ip>:8899`
+2. **Teilen-Button** (Mitte der unteren Leiste)
+3. **"Zum Home-Bildschirm"** tippen
+4. Name bestätigen → **"Hinzufügen"**
+5. App-Icon erscheint auf dem Homescreen – wie eine native App
+
+**EN**
+1. Open Safari → `https://<your-ip>:8899`
+2. Tap the **Share button** (center of bottom bar)
+3. Scroll down → tap **"Add to Home Screen"**
+4. Confirm the name → tap **"Add"**
+5. The app icon appears on your homescreen – runs in fullscreen like a native app
+
+### Android
+
+Chrome zeigt beim ersten Besuch einen Install-Banner an (oder Menü → "Installieren").
+Chrome shows an install banner on first visit (or menu → "Install").
 
 ---
 
