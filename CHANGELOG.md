@@ -4,6 +4,25 @@ All changes to Grot2Buy with explanations.
 
 ---
 
+## [0.4.2] — 2026-07-08
+
+### 🚀 Initialer Auto-Sync beim Seitenstart
+
+**Bugfix — Einkaufsdaten wurden nicht geladen ohne händischen Sync-Button**
+
+- **Frontend**: `DOMContentLoaded` führt jetzt immer `POST /api/sync/full` aus, bevor `loadItems()` die UI rendert — der Sync-Button ist nur noch für manuelles Re-Sync.
+- **Backend**: `api_synced_items` hat `is_initial=True` Flag für den Sync — neu aus BAP auftauchende purchased-Items werden als aktiv (nicht purchased) in die synced-Liste übernommen, damit die Liste beim ersten Start nicht leer bleibt.
+- **Backend**: BAP-Client wird in `/api/lists` und `/api/lists/{id}/items` via `shopping_manager._bap` recycelt (kein `create_client()` mehr pro Call).
+- **Backend**: Timeout (10s connect, 30s read) für alle BAP-Requests.
+- **Frontend**: `watchSyncErrors()` war undefiniert → entfernt.
+- **Cache bust**: `?v=4` → `?v=5`, SW-Cache `grot2buy-v3` → `grot2buy-v4`
+
+**Version**: `0.4.1` → `0.4.2`
+
+---
+
+## [0.4.1] — 2026-07-08
+
 ## [0.4.0] — 2026-07-08
 
 ### 🌗 Dark Mode + Push Notifications + Dead Code Removal

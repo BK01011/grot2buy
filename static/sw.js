@@ -1,10 +1,10 @@
-const CACHE = 'grot2buy-v3';
+const CACHE = 'grot2buy-v4';
 
 const PRECACHE = [
   '/',
-  '/static/style.css?v=4',
+  '/static/style.css?v=5',
   '/static/app.js',
-  '/static/logo.svg?v=4',
+  '/static/logo.svg?v=5',
   '/static/manifest.json',
 ];
 
@@ -35,8 +35,8 @@ self.addEventListener('message', (event) => {
   if (event.data?.type === 'show-notification') {
     self.registration.showNotification(event.data.title, {
       body: event.data.body,
-      icon: '/static/logo.svg?v=4',
-      badge: '/static/logo.svg?v=4',
+      icon: '/static/logo.svg?v=5',
+      badge: '/static/logo.svg?v=5',
       vibrate: [200, 100, 200],
     });
   }

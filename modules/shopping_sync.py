@@ -62,7 +62,7 @@ class ShoppingSync:
 
     # ─── Sync ──────────────────────────────────────────────────
 
-    def sync_full(self, grocy_client, bap_client) -> str:
+    def sync_full(self, grocy_client, bap_client, is_initial: bool = False) -> str:
         log = []
         log.append("=== SYNC START ===")
 
@@ -141,13 +141,18 @@ class ShoppingSync:
 
         for nn, entry in bap_purchased.items():
             if nn not in synced_by_nn:
-                item = {"name": entry["title"], "quantity": 1, "category": "",
-                       "source": "bap", "purchased": True,
-                       "purchased_at": datetime.now().isoformat()}
+                if is_initial and nn not in grocy_active and nn not in grocy_done:
+                    item = {"name": entry["title"], "quantity": 1, "category": "",
+                           "source": "bap", "added_at": datetime.now().isoformat()}
+                    log.append(f"  Neu in synced (BAP purchased → aktiv weil initial): {entry['title']}")
+                else:
+                    item = {"name": entry["title"], "quantity": 1, "category": "",
+                           "source": "bap", "purchased": True,
+                           "purchased_at": datetime.now().isoformat()}
+                    log.append(f"  Neu in synced (BAP purchased): {entry['title']}")
                 self._synced_items.append(item)
                 synced_by_nn[nn] = item
                 fresh_items.add(nn)
-                log.append(f"  Neu in synced (BAP purchased): {entry['title']}")
 
         for nn, entry in grocy_active.items():
             if nn not in synced_by_nn:

@@ -15,7 +15,7 @@ from typing import Optional
 from contextlib import asynccontextmanager
 from datetime import datetime
 
-VERSION = "0.4.1"
+VERSION = "0.4.2"
 
 # Logging
 logging.basicConfig(
@@ -559,15 +559,30 @@ async def api_synced(_: bool = Depends(verify_token)):
 
 @app.get("/api/synced/items")
 async def api_synced_items(_: bool = Depends(verify_token)):
-    """Gibt die synchronisierte Liste als JSON-Array zurück."""
-    active = [i for i in shopping_sync._synced_items if not i.get("purchased")]
+    """Gibt die synchronisierte Liste als JSON-Array zurück.
+    Führt impliziten Erst-Sync durch, wenn die Liste noch leer ist."""
+    if not shopping_sync._synced_items and (shopping_manager._bap or shopping_manager._grocy):
+        logger.info("🔄 Synced-Liste leer → initialer Auto-Sync")
+        try:
+            shopping_sync.sync_full(shopping_manager._grocy, shopping_manager._bap, is_initial=True)
+        except Exception as e:
+            logger.error(f"❌ Initialer Sync fehlgeschlagen: {e}")
+    all_items = shopping_sync._synced_items[:]
+    active = [i for i in all_items if not i.get("purchased")]
+    purchased = [i for i in all_items if i.get("purchased")]
     by_category = {}
     for item in active:
         cat = item.get("category", "") or "Sonstiges"
         if cat not in by_category:
             by_category[cat] = []
         by_category[cat].append(item)
-    return JSONResponse({"items": active, "by_category": by_category, "count": len(active)})
+    return JSONResponse({
+        "items": active,
+        "purchased": purchased,
+        "by_category": by_category,
+        "count": len(active),
+        "total": len(all_items),
+    })
 
 
 @app.post("/api/synced/reset")

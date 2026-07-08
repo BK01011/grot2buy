@@ -87,10 +87,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     applyTheme(localStorage.getItem('grot2buy_theme') || 'auto');
     updateDarkModeBtn();
     requestNotificationPermission();
-    watchSyncErrors();
 
-    // Parallele API-Calls statt sequentiell — loadItems zeigt sofort Spinner,
-    // loadLists blockiert nicht mehr die ganze Seite bei trägem BAP
+    // Immer einen initialen Sync ausführen — das befüllt die synced-Liste
+    // UND aktualisiert die BAP-Listenzähler (über /api/lists).
+    // Vor dem Start: MUSS syncWithBAP statt loadItems laufen, weil
+    // der Sync erst die Daten aus BAP/Grocy holen muss.
+    try {
+        await api('/sync/full');
+    } catch (e) {
+        console.error('Initial sync failed:', e);
+    }
+
     await Promise.all([
         loadCategories(),
         loadLists(),
