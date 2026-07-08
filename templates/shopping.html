@@ -4,28 +4,30 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Grot2Buy</title>
-    <link rel="stylesheet" href="/static/style.css?v=6">
-    <link rel="icon" href="/static/logo.svg?v=6" type="image/svg+xml">
+    <link rel="stylesheet" href="/static/style.css?v=7">
+    <link rel="icon" href="/static/logo.svg?v=7" type="image/svg+xml">
     <link rel="manifest" href="/static/manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Grot2Buy">
-    <link rel="apple-touch-icon" href="/static/logo.svg?v=6">
+    <link rel="apple-touch-icon" href="/static/logo.svg?v=7">
 </head>
 <body>
     <div class="app">
         <!-- Header -->
         <header class="header">
             <div class="header-left">
-                <img src="/static/logo.svg?v=6" alt="Grot2Buy" class="header-logo">
+                <img src="/static/logo.svg?v=7" alt="Grot2Buy" class="header-logo">
                 <h1>{{ t("header.title") }}</h1>
                 <span class="item-count" id="itemCount">0</span>
             </div>
             <div class="header-right">
-                <div class="sync-status" id="syncStatus" title="{{ t('sync.status_never') }}">
-                    <span class="sync-led sync-led--gray" id="syncLed"></span>
-                    <span class="sync-time" id="syncTime">{{ t('sync.status_never') }}</span>
-                </div>
+                <span class="sync-pill" id="syncStatus" title="{{ t('sync.status_never') }}">
+                    <svg class="pill-icon" id="pillIcon" viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+                        <path id="pillPath" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                    </svg>
+                    <span class="pill-text" id="pillText">{{ t('sync.status_never') }}</span>
+                </span>
                 <button class="btn-icon" onclick="syncWithBAP()" title="{{ t('header.sync') }}" id="syncBtn">
                     <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
@@ -206,6 +208,8 @@
                         <li>{{ t("help.usage_qty") }}</li>
                         <li>{{ t("help.usage_remove") }}</li>
                         <li>{{ t("help.usage_sync") }}</li>
+                        <li>{{ t("help.usage_status") }}</li>
+                        <li>{{ t("help.usage_pull") }}</li>
                         <li>{{ t("help.usage_dark") }}</li>
                         <li>{{ t("help.usage_pwa") }}</li>
                     </ul>

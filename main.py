@@ -15,7 +15,7 @@ from typing import Optional
 from contextlib import asynccontextmanager
 from datetime import datetime
 
-VERSION = "0.4.2"
+VERSION = "0.5.0"
 
 # Logging
 logging.basicConfig(

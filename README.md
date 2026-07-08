@@ -10,6 +10,8 @@ Grot2Buy merges your shopping list services into one central list and keeps them
 - **Bidirectional Sync** – Grocy ↔ Grot2Buy ↔ Buy Me a Pie
 - **Auto-Sync on load** – Data appears immediately, no manual sync needed
 - **Auto-Sync (background)** – Configurable interval (web UI)
+- **Sync Status Pill** – Color-coded status in header (green=ok, yellow=syncing, red=error) with last sync time
+- **Pull-to-Refresh** – Swipe down on mobile to trigger sync
 - **PWA** – Installable on iOS/Android homescreen (fullscreen mode)
 - **Dark Mode** – Auto/Dark/Light toggle with system preference detection
 - **Push Notifications** – Desktop notifications on sync errors

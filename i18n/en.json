@@ -154,6 +154,8 @@
     "usage_qty": "➕/➖ Change quantity: Buttons on the item",
     "usage_remove": "✕ Remove item: X button on the right",
     "usage_sync": "🔄 Sync: Automatic on page load — Sync button for manual re-sync",
+    "usage_status": "● Sync status: Shows last sync time; green=ok, yellow=syncing, red=error",
+    "usage_pull": "📱 Pull-to-Refresh: Swipe down on mobile to trigger sync",
     "usage_dark": "🌗 Dark mode: Sun/moon icon top right",
     "usage_pwa": "📲 PWA: Close app (swipe from homescreen) and reopen after update",
     "credits_title": "Acknowledgements",

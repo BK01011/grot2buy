@@ -154,6 +154,8 @@
     "usage_qty": "➕/➖ Menge ändern: Buttons am Artikel",
     "usage_remove": "✕ Artikel entfernen: X-Button rechts",
     "usage_sync": "🔄 Synchronisieren: Automatisch beim Start — Sync-Button für manuelles Re-Sync",
+    "usage_status": "● Sync-Status: Zeigt letzte Sync-Zeit an; grün=ok, gelb=Sync läuft, rot=Fehler",
+    "usage_pull": "📱 Pull-to-Refresh: Auf Mobilgerät nach unten ziehen zum Sync",
     "usage_dark": "🌗 Dark Mode: Sonne/Mond-Icon oben rechts",
     "usage_pwa": "📲 PWA: Nach Update App schließen (vom Homescreen wegwischen) und neu öffnen",
     

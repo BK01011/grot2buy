@@ -1,4 +1,4 @@
-# Grot2Buy v0.4.2
+# Grot2Buy v0.5.0
 
 Bidirektionale Synchronisation zwischen Buy Me a Pie, Grocy und lokaler Einkaufsliste.
 Architektur: Zentrale Liste (synced_items) als Wahrheitsquelle, **wer geändert hat gewinnt** (statt "Grocy immer").
@@ -40,6 +40,13 @@ docker restart shopping-list
 - `GET /api/synced/items` - Synced-Liste als JSON
 - `GET /health` - Status-Ping
 
+## Frontend — Sync-Status
+
+- **Sync-Pill** im Header: Icon + letzte Sync-Zeit, farbcodiert (grün/gelb/rot)
+- **Pull-to-Refresh**: Touch-swipe-down auf Mobilgeräten triggert Sync
+- Status persistiert in `localStorage('grot2buy_last_sync')`
+- Bei Fehler zeigt die Pill rot, bei Sync-Vorgang gelb mit rotierendem Icon
+
 ## Sync v5.2 — Bekannte Probleme
 
 1. **Kein Timestamp-Tracking**: Änderungsdetektion vergleicht nur purchased/nicht-purchased. Gleichzeitige Änderungen in beiden Quellen → Grocy gewinnt (konfigurierbar).
@@ -56,7 +63,7 @@ Sprache wird in `config["lang"]` gespeichert. Neue Sprache hinzufügen:
 
 ## Aktuelle Version
 
-`0.4.2` — Auto-Sync beim Start, Dark Mode, Push-Benachrichtigungen,
-BAP-Client-Recycling, Timeouts
+`0.5.0` — Sync-Status-Pill im Header, Pull-to-Refresh, 
+überarbeitetes Header-Layout (größeres Logo, kleinere Schrift)
 
 Autor: S.B. | Lizenz: MIT | Erstellt mit KI-Unterstützung (opencode, Claude)
