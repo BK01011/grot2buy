@@ -4,6 +4,27 @@ All changes to Grot2Buy with explanations.
 
 ---
 
+## [0.4.0] — 2026-07-08
+
+### 🌗 Dark Mode + Push Notifications + Dead Code Removal
+
+**New**:
+- **Dark mode toggle** — Sun/moon icon in header, cycles Auto → Dark → Light; setting in preferences (dropdown Sync/Auto/Dark/Light); persistence via `localStorage` + `prefers-color-scheme` detection
+- **Push notifications** — Desktop notifications on sync errors via Service Worker `showNotification()`; permission requested on page load; icon + vibration on notification
+- **Dead code removed** (`shopping.py` -297 lines):
+  - `ShoppingItem` class — obsolete (replaced by `synced_items` dict)
+  - `LocalShoppingList` class — obsolete (replaced by `shopping_sync` JSON)
+  - `DATA_DIR` / `SHOPPING_FILE` constants — only used by deleted classes
+  - `GrocyClient.get_stock()`, `get_low_stock()`, `to_shopping_text()`, `to_stock_text()` — never called
+  - `ShoppingManager.get_items_as_text()`, `get_stock_text()`, `add_item()`, `remove_item()`, `mark_purchased()`, `sync_lists()`, `get_synced_text()`, `export_for_buymeapie()`, `add_to_synced()`, `remove_from_synced()`, `clear_synced()`, `update_quantity()` — duplicates of `shopping_sync` methods, never called
+  - `configure_grocy` now uses `get_shopping_list()` instead of removed `get_stock()` for connection test
+- `i18n/de.json` + `i18n/en.json` — new keys for dark mode (`header.darkmode`, `settings.appearance_section`, `settings.darkmode_*`) and push notifications (`notify.*`)
+- **Cache bust**: `?v=2` → `?v=3` (SW, CSS, manifest, logo)
+
+**Version**: `0.3.1` → `0.4.0`
+
+---
+
 ## [0.3.0] — 2026-07-08
 
 ### 🌍 Multilingual Support (i18n)
@@ -260,6 +281,27 @@ value = Fernet(key).decrypt(token.encode()).decode()
 # Changelog — Grot2Buy
 
 Alle Änderungen an Grot2Buy mit Begründungen.
+
+---
+
+## [0.4.0] — 2026-07-08
+
+### 🌗 Dark Mode + Push-Benachrichtigungen + Toter Code entfernt
+
+**Neu**:
+- **Dark Mode Umschalter** — Sonne/Mond-Icon im Header, Zyklus Auto→Dunkel→Hell; Einstellung in den Preferences (Dropdown Auto/Dunkel/Hell); Speicherung via `localStorage` + `prefers-color-scheme`-Erkennung
+- **Push-Benachrichtigungen** — Desktop-Benachrichtigungen bei Sync-Fehlern via Service Worker `showNotification()`; Berechtigungsabfrage beim Seitenladen; Icon + Vibration
+- **Toter Code entfernt** (`shopping.py` -297 Zeilen):
+  - `ShoppingItem`-Klasse — obsolet (ersetzt durch `synced_items`-Dict)
+  - `LocalShoppingList`-Klasse — obsolet (ersetzt durch `shopping_sync`-JSON)
+  - `DATA_DIR`/`SHOPPING_FILE`-Konstanten — nur von entfernten Klassen genutzt
+  - `GrocyClient.get_stock()`, `get_low_stock()`, `to_shopping_text()`, `to_stock_text()` — nie aufgerufen
+  - `ShoppingManager.get_items_as_text()`, `get_stock_text()`, `add_item()`, `remove_item()`, `mark_purchased()`, `sync_lists()`, `get_synced_text()`, `export_for_buymeapie()`, `add_to_synced()`, `remove_from_synced()`, `clear_synced()`, `update_quantity()` — Duplikate von `shopping_sync`-Methoden, nie aufgerufen
+  - `configure_grocy` nutzt jetzt `get_shopping_list()` statt des entfernten `get_stock()` für Verbindungstest
+- `i18n/de.json` + `i18n/en.json` — neue Keys für Dark Mode (`header.darkmode`, `settings.appearance_section`, `settings.darkmode_*`) und Push-Benachrichtigungen (`notify.*`)
+- **Cache-Bust**: `?v=2` → `?v=3` (SW, CSS, Manifest, Logo)
+
+**Version**: `0.3.1` → `0.4.0`
 
 ---
 

@@ -15,9 +15,79 @@ function __(key, ...args) {
     return msg;
 }
 
+// ─── Dark Mode ────────────────────────────────────────────────
+
+function applyTheme(theme) {
+    if (theme === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+    } else if (theme === 'light') {
+        document.documentElement.removeAttribute('data-theme');
+    } else {
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (prefersDark) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        } else {
+            document.documentElement.removeAttribute('data-theme');
+        }
+    }
+}
+
+function toggleDarkMode(theme) {
+    if (!theme) {
+        const current = localStorage.getItem('grot2buy_theme') || 'auto';
+        if (current === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            theme = 'light';
+        } else if (current === 'auto') {
+            theme = 'dark';
+        } else if (current === 'dark') {
+            theme = 'light';
+        } else {
+            theme = 'auto';
+        }
+    }
+    localStorage.setItem('grot2buy_theme', theme);
+    applyTheme(theme);
+    updateDarkModeBtn();
+    const sel = document.getElementById('darkModeSelect');
+    if (sel) sel.value = theme;
+}
+
+function updateDarkModeBtn() {
+    const btn = document.getElementById('darkModeBtn');
+    if (!btn) return;
+    const theme = localStorage.getItem('grot2buy_theme') || 'auto';
+    const sel = document.getElementById('darkModeSelect');
+    if (sel) sel.value = theme;
+    if (theme === 'dark') {
+        btn.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+    } else {
+        btn.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
+    }
+}
+
+// ─── Push Notifications ───────────────────────────────────────
+
+async function requestNotificationPermission() {
+    if (!('Notification' in window) || !navigator.serviceWorker?.controller) return;
+    if (Notification.permission === 'default') {
+        await Notification.requestPermission();
+    }
+}
+
+async function sendNotification(title, body) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    if (navigator.serviceWorker?.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: 'show-notification', title, body });
+    }
+}
+
 // ─── Init ────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', async () => {
+    applyTheme(localStorage.getItem('grot2buy_theme') || 'auto');
+    updateDarkModeBtn();
+    requestNotificationPermission();
+    watchSyncErrors();
     await loadCategories();
     await loadLists();
     await loadItems();
@@ -335,6 +405,7 @@ async function syncWithBAP() {
         await loadItems();
     } catch (e) {
         toast( __('sync.failed') );
+        sendNotification(__('notify.sync_error'), __('notify.sync_error_body', { status: e.message }));
     } finally {
         btn.classList.remove('syncing');
     }
@@ -348,6 +419,7 @@ async function pullFromGrocy() {
         await loadItems();
     } catch (e) {
         toast( __('sync.pull_failed') );
+        sendNotification(__('notify.sync_error'), __('notify.sync_error_body', { status: e.message }));
     }
 }
 
@@ -360,6 +432,8 @@ async function openSettings() {
         document.getElementById('bapUser').value = data.bap_user || '';
         document.getElementById('syncInterval').value = data.sync_interval ?? 5;
     } catch (e) {}
+    const sel = document.getElementById('darkModeSelect');
+    if (sel) sel.value = localStorage.getItem('grot2buy_theme') || 'auto';
 }
 
 async function saveBAPConfig() {

@@ -3,7 +3,8 @@
     "title": "Grot2Buy",
     "sync": "Synchronisieren",
     "settings": "Einstellungen",
-    "add": "Artikel hinzufügen"
+    "add": "Artikel hinzufügen",
+    "darkmode": "Dark Mode umschalten"
   },
   "tab": {
     "synced": "📋 Synchronisiert",
@@ -56,7 +57,12 @@
     "clear_purchased": "Erledigte löschen",
     "docs_section": "Dokumentation",
     "docs_doku": "DOKU.md herunterladen",
-    "docs_changelog": "CHANGELOG.md herunterladen"
+    "docs_changelog": "CHANGELOG.md herunterladen",
+    "appearance_section": "Darstellung",
+    "darkmode_label": "Dark Mode",
+    "darkmode_auto": "Automatisch",
+    "darkmode_dark": "Dunkel",
+    "darkmode_light": "Hell"
   },
   "item": {
     "remove_confirm": "\"{name}\" entfernen?",
@@ -127,5 +133,11 @@
   },
   "config": {
     "bap_updated": "BAP-Zugangsdaten aktualisiert."
+  },
+  "notify": {
+    "sync_error": "Sync fehlgeschlagen",
+    "sync_error_body": "HTTP {status} — Sync konnte nicht abgeschlossen werden",
+    "connection_lost": "Verbindung verloren",
+    "connection_lost_body": "Die Verbindung zum Server wurde unterbrochen"
   }
 }

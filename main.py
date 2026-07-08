@@ -14,7 +14,7 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 from datetime import datetime
 
-VERSION = "0.3.1"
+VERSION = "0.4.0"
 
 # Logging
 logging.basicConfig(
@@ -58,7 +58,7 @@ def template_context(request: Request, extra: dict = None) -> dict:
 DEFAULT_CATEGORIES = [
     "Obst & Gemüse", "Milchprodukte", "Fleisch & Wurst",
     "Getränke", "Brot & Gebäck", "Vorrat",
-    "Tiefkühl", "Süßigkeiten", "Drogerie",     "Sonstiges"
+    "Tiefkühl", "Süßigkeiten", "Drogerie", "Sonstiges"
 ]
 
 

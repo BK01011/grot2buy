@@ -3,7 +3,8 @@
     "title": "Grot2Buy",
     "sync": "Synchronize",
     "settings": "Settings",
-    "add": "Add item"
+    "add": "Add item",
+    "darkmode": "Toggle dark mode"
   },
   "tab": {
     "synced": "📋 Synced",
@@ -56,7 +57,12 @@
     "clear_purchased": "Clear purchased",
     "docs_section": "Documentation",
     "docs_doku": "Download DOKU.md",
-    "docs_changelog": "Download CHANGELOG.md"
+    "docs_changelog": "Download CHANGELOG.md",
+    "appearance_section": "Appearance",
+    "darkmode_label": "Dark Mode",
+    "darkmode_auto": "Auto",
+    "darkmode_dark": "Dark",
+    "darkmode_light": "Light"
   },
   "item": {
     "remove_confirm": "Remove \"{name}\"?",
@@ -127,5 +133,11 @@
   },
   "config": {
     "bap_updated": "BAP credentials updated."
+  },
+  "notify": {
+    "sync_error": "Sync failed",
+    "sync_error_body": "HTTP {status} — sync could not complete",
+    "connection_lost": "Connection lost",
+    "connection_lost_body": "Connection to the server was interrupted"
   }
 }

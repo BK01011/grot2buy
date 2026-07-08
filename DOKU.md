@@ -42,6 +42,8 @@ Grot2Buy is a self-hosted shopping list management application. It synchronizes 
 - Categorization by EAN prefix
 - Quantity management per item
 - Encrypted credentials (Fernet/AES)
+- Dark mode (auto/system/manual toggle, persisted in localStorage)
+- Push notifications on sync errors (desktop via Service Worker)
 - Mobile-optimized user interface
 - HTTPS with self-signed certificate
 
@@ -152,7 +154,7 @@ docker compose logs -f
 curl -k https://localhost:8899/health
 
 # Expected response:
-# {"status":"ok","service":"grot2buy","version":"0.3.0"}
+# {"status":"ok","service":"grot2buy","version":"0.4.0"}
 ```
 
 ### 4. Enable auto-start on system boot
@@ -496,20 +498,22 @@ assistant/
 ├── modules/
 │   ├── __init__.py
 │   ├── config.py           # Encrypted config (158 lines)
+│   ├── i18n.py             # Translation engine (70 lines)
 │   ├── buymeapie.py        # BAP API client (178 lines)
-│   ├── shopping.py         # Grocy client + ShoppingManager (437 lines)
+│   ├── shopping.py         # Grocy client + ShoppingManager (150 lines)
 │   └── shopping_sync.py    # Bidirectional sync + Sync API (550+ lines)
 ├── templates/
-│   ├── shopping.html       # Main page (177 lines)
+│   ├── shopping.html       # Main page (185 lines)
+│   ├── setup.html          # Setup wizard
 │   └── login.html          # Login page (32 lines)
 ├── static/
-│   ├── app.js              # Frontend logic (469 lines)
-│   └── style.css           # CSS styles (636 lines)
+│   ├── sw.js               # Service Worker (with notification support)
+│   ├── app.js              # Frontend logic (530 lines)
+│   ├── style.css           # CSS styles (640 lines)
+│   └── logo.svg            # App icon
 ├── data/                   # Persistent data (Docker volume)
 │   ├── config.json         # Configuration
-│   ├── shopping_sync.json  # Synced list
-│   ├── shopping.json       # Local shopping list
-│   └── secret.key          # Encryption key
+│   └── shopping_sync.json  # Synced list
 └── certs/                  # SSL certificates (Docker volume)
     ├── server.crt
     └── server.key
@@ -618,6 +622,8 @@ Grot2Buy ist eine selbst-gehostete Anwendung zur Verwaltung von Einkaufslisten. 
 - Kategorisierung nach EAN-Präfix
 - Mengenverwaltung pro Artikel
 - Verschlüsselte Zugangsdaten (Fernet/AES)
+- Dark Mode (Auto/System/Manuell, persistiert in localStorage)
+- Push-Benachrichtigungen bei Sync-Fehlern (Desktop via Service Worker)
 - Mobile-optimierte Benutzeroberfläche
 - HTTPS mit selbst-gezeichnetem Zertifikat
 
@@ -728,7 +734,7 @@ docker compose logs -f
 curl -k https://localhost:8899/health
 
 # Erwartete Antwort:
-# {"status":"ok","service":"grot2buy","version":"0.3.0"}
+# {"status":"ok","service":"grot2buy","version":"0.4.0"}
 ```
 
 ### 4. Auto-Start bei Systemstart aktivieren
@@ -1077,20 +1083,22 @@ assistant/
 ├── modules/
 │   ├── __init__.py
 │   ├── config.py           # Verschlüsselte Konfiguration (158 Zeilen)
+│   ├── i18n.py             # Übersetzungs-Modul (70 Zeilen)
 │   ├── buymeapie.py        # BAP API Client (178 Zeilen)
-│   ├── shopping.py         # Grocy Client + ShoppingManager (437 Zeilen)
+│   ├── shopping.py         # Grocy Client + ShoppingManager (150 Zeilen)
 │   └── shopping_sync.py    # Bidirektionale Synchronisation + Sync-API (550+ Zeilen)
 ├── templates/
-│   ├── shopping.html       # Hauptseite (177 Zeilen)
+│   ├── shopping.html       # Hauptseite (185 Zeilen)
+│   ├── setup.html          # Setup-Wizard
 │   └── login.html          # Login-Seite (32 Zeilen)
 ├── static/
-│   ├── app.js              # Frontend-Logik (469 Zeilen)
-│   └── style.css           # CSS-Styles (636 Zeilen)
+│   ├── sw.js               # Service Worker (mit Benachrichtigungen)
+│   ├── app.js              # Frontend-Logik (530 Zeilen)
+│   ├── style.css           # CSS-Styles (640 Zeilen)
+│   └── logo.svg            # App-Icon
 ├── data/                   # Persistente Daten (Docker Volume)
 │   ├── config.json         # Konfiguration
-│   ├── shopping_sync.json  # Synced-Liste
-│   ├── shopping.json       # Lokale Einkaufsliste
-│   └── secret.key          # Verschlüsselungsschlüssel
+│   └── shopping_sync.json  # Synced-Liste
 └── certs/                  # SSL-Zertifikate (Docker Volume)
     ├── server.crt
     └── server.key

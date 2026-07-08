@@ -56,6 +56,6 @@ Sprache wird in `config["lang"]` gespeichert. Neue Sprache hinzufügen:
 
 ## Aktuelle Version
 
-`0.3.0` — Mehrsprachig (DE/EN, erweiterbar), Sprachauswahl in Einstellungen & Setup
+`0.4.0` — Mehrsprachig (DE/EN, erweiterbar), Sprachauswahl in Einstellungen & Setup
 
 Autor: S.B. | Lizenz: MIT | Erstellt mit KI-Unterstützung (opencode, Claude)

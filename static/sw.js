@@ -1,10 +1,10 @@
-const CACHE = 'grot2buy-v1';
+const CACHE = 'grot2buy-v2';
 
 const PRECACHE = [
   '/',
-  '/static/style.css?v=2',
+  '/static/style.css?v=3',
   '/static/app.js',
-  '/static/logo.svg?v=2',
+  '/static/logo.svg?v=3',
   '/static/manifest.json',
 ];
 
@@ -29,4 +29,26 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     fetch(event.request).catch(() => caches.match(event.request))
   );
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'show-notification') {
+    self.registration.showNotification(event.data.title, {
+      body: event.data.body,
+      icon: '/static/logo.svg?v=3',
+      badge: '/static/logo.svg?v=3',
+      vibrate: [200, 100, 200],
+    });
+  }
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then((cl) => {
+    if (cl.length > 0) {
+      cl[0].focus();
+    } else {
+      clients.openWindow('/');
+    }
+  }));
 });
