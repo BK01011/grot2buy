@@ -9,7 +9,6 @@ import json
 import secrets
 import hashlib
 import logging
-import re
 import asyncio
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -56,40 +55,11 @@ def template_context(request: Request, extra: dict = None) -> dict:
         ctx.update(extra)
     return ctx
 
-# Barcode-Kategorie-Zuordnung (EAN-Präfixe)
-BARCODE_CATEGORIES = {
-    "400": "Getränke", "401": "Milchprodukte", "403": "Süßigkeiten",
-    "500": "Obst & Gemüse", "690": "Asia-Produkte", "80": "Italien",
-    "30": "Frankreich", "00": "USA", "84": "Spanien",
-}
-
 DEFAULT_CATEGORIES = [
     "Obst & Gemüse", "Milchprodukte", "Fleisch & Wurst",
     "Getränke", "Brot & Gebäck", "Vorrat",
-    "Tiefkühl", "Süßigkeiten", "Drogerie", "Sonstiges"
+    "Tiefkühl", "Süßigkeiten", "Drogerie",     "Sonstiges"
 ]
-
-
-def categorize_barcode(barcode: str) -> str:
-    """Ordnet einen Barcode einer Kategorie zu (längster Prefix zuerst)."""
-    if not barcode or not barcode.isdigit():
-        return "Sonstiges"
-    for prefix_len in sorted({len(k) for k in BARCODE_CATEGORIES}, reverse=True):
-        prefix = barcode[:prefix_len]
-        if prefix in BARCODE_CATEGORIES:
-            return BARCODE_CATEGORIES[prefix]
-    return "Sonstiges"
-
-
-def parse_barcode_input(text: str) -> tuple[str, str]:
-    """Parst Eingabe mit optionalem Barcode: 'Artikelname [1234567890123]' oder '1234567890123'."""
-    match = re.search(r'\[(\d{8,14})\]', text)
-    if match:
-        name = text[:match.start()].strip()
-        return name, match.group(1)
-    if text.strip().isdigit() and 8 <= len(text.strip()) <= 14:
-        return "", text.strip()
-    return text.strip(), ""
 
 
 # Passwort-Hashing (PBKDF2-SHA256)
@@ -338,38 +308,23 @@ async def api_list_items(list_id: str, _: bool = Depends(verify_token)):
 
 @app.post("/api/items/add")
 async def api_add_item(request: Request, _: bool = Depends(verify_token)):
-    """Fügt einen Artikel hinzu — mit optionalem Barcode."""
+    """Fügt einen Artikel hinzu."""
     body = await request.json()
     name = body.get("name", "").strip()
     quantity = body.get("quantity", 1)
     category = body.get("category", "")
-    list_id = body.get("list_id")
-    barcode = body.get("barcode", "")
-
-    # Barcode-Eingabe parsen
-    if not name and barcode:
-        parsed_name, parsed_barcode = parse_barcode_input(barcode)
-        if parsed_barcode:
-            barcode = parsed_barcode
-        name = parsed_name
 
     if not name:
         return JSONResponse({"error": "Name erforderlich"}, status_code=400)
 
-    # Barcode-Kategorie zuordnen
-    if barcode and not category:
-        category = categorize_barcode(barcode)
-
-    # Zur synchronisierten Liste hinzufügen
     result = shopping_sync.add_item(name, quantity, category)
-    logger.info(f"➕ Hinzugefügt: {name} (x{quantity}, {category}, Barcode: {barcode or 'keiner'})")
+    logger.info(f"➕ Hinzugefügt: {name} (x{quantity}, {category})")
 
     return JSONResponse({
         "result": result,
         "name": name,
         "quantity": quantity,
         "category": category,
-        "barcode": barcode,
     })
 
 
@@ -378,11 +333,9 @@ async def api_add_items_bulk(request: Request, _: bool = Depends(verify_token)):
     """Fügt mehrere Artikel hinzu (CSV-Format oder JSON-Array)."""
     body = await request.json()
     items_text = body.get("items", "")
-    list_id = body.get("list_id")
 
     added = 0
     skipped = 0
-    errors = []
 
     if isinstance(items_text, str):
         lines = [l.strip() for l in items_text.split("\n") if l.strip()]
@@ -392,15 +345,17 @@ async def api_add_items_bulk(request: Request, _: bool = Depends(verify_token)):
         return JSONResponse({"error": "Ungültiges Format"}, status_code=400)
 
     for line in lines:
-        name, barcode = parse_barcode_input(line)
-        if not name and barcode:
-            name = f"Artikel {barcode[-4:]}"
+        name = line
+        if isinstance(line, dict):
+            name = line.get("name", "")
         if not name:
             skipped += 1
             continue
 
-        category = categorize_barcode(barcode) if barcode else ""
-        result = shopping_sync.add_item(name, 1, category)
+        qty = 1
+        if isinstance(line, dict):
+            qty = line.get("quantity", 1)
+        result = shopping_sync.add_item(name, qty, "")
         if "hinzugefügt" in result or "aktualisiert" in result:
             added += 1
         else:
