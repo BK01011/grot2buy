@@ -32,7 +32,7 @@ class BuyMeAPieClient:
                 return True
             return False
         except Exception as e:
-            print(f"❌ BAP Login fehlgeschlagen: {e}")
+            logger.error(f"❌ BAP Login fehlgeschlagen: {e}")
             return False
 
     def _ensure_login(self):
@@ -48,7 +48,7 @@ class BuyMeAPieClient:
                 return resp.json()
             return []
         except Exception as e:
-            print(f"❌ BAP Listen-Fehler: {e}")
+            logger.error(f"❌ BAP Listen-Fehler: {e}")
             return []
 
     def get_list_items(self, list_id: str) -> list:
@@ -60,7 +60,7 @@ class BuyMeAPieClient:
                 return resp.json()
             return []
         except Exception as e:
-            print(f"❌ BAP Artikel-Fehler: {e}")
+            logger.error(f"❌ BAP Artikel-Fehler: {e}")
             return []
 
     def get_active_items(self, list_id: str) -> list:
@@ -94,7 +94,7 @@ class BuyMeAPieClient:
             resp = self.session.post(f"{self.BASE_URL}/lists/{list_id}/items", json=data)
             return "added" if resp.status_code in (200, 201) else "error"
         except Exception as e:
-            print(f"❌ BAP Hinzufügen fehlgeschlagen: {e}")
+            logger.error(f"❌ BAP Hinzufügen fehlgeschlagen: {e}")
             return "error"
 
     def add_items_bulk(self, items: list[dict], list_id: Optional[str] = None) -> tuple[int, int]:
@@ -126,7 +126,7 @@ class BuyMeAPieClient:
             resp = self.session.delete(f"{self.BASE_URL}/lists/{list_id}/items/{item_id}")
             return resp.status_code in (200, 204)
         except Exception as e:
-            print(f"❌ BAP Löschen fehlgeschlagen: {e}")
+            logger.error(f"❌ BAP Löschen fehlgeschlagen: {e}")
             return False
 
     def mark_purchased(self, list_id: str, item_id: str) -> bool:
@@ -137,7 +137,7 @@ class BuyMeAPieClient:
             resp = self.session.put(url, json={"is_purchased": True})
             return resp.status_code in (200, 204)
         except Exception as e:
-            print(f"❌ BAP Kauf-Markierung fehlgeschlagen: {e}")
+            logger.error(f"❌ BAP Kauf-Markierung fehlgeschlagen: {e}")
             return False
 
     def close(self):

@@ -71,11 +71,14 @@ DEFAULT_CATEGORIES = [
 
 
 def categorize_barcode(barcode: str) -> str:
-    """Ordnet einen Barcode einer Kategorie zu."""
+    """Ordnet einen Barcode einer Kategorie zu (längster Prefix zuerst)."""
     if not barcode or not barcode.isdigit():
         return "Sonstiges"
-    prefix = barcode[:3]
-    return BARCODE_CATEGORIES.get(prefix, "Sonstiges")
+    for prefix_len in sorted({len(k) for k in BARCODE_CATEGORIES}, reverse=True):
+        prefix = barcode[:prefix_len]
+        if prefix in BARCODE_CATEGORIES:
+            return BARCODE_CATEGORIES[prefix]
+    return "Sonstiges"
 
 
 def parse_barcode_input(text: str) -> tuple[str, str]:
@@ -158,9 +161,7 @@ async def _background_sync():
             interval = config.get("sync_interval", 5)
             if interval and interval > 0:
                 await asyncio.sleep(interval * 60)
-                bap_user = config.get_decrypted("bap_user", "")
-                bap_pass = config.get_decrypted("bap_pass", "")
-                bap_client = create_client(bap_user, bap_pass) if bap_user and bap_pass else None
+                bap_client = shopping_manager._bap
                 grocy = shopping_manager._grocy
                 if grocy or bap_client:
                     result = shopping_sync.sync_full(grocy, bap_client)

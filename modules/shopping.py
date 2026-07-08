@@ -1,10 +1,13 @@
 """Einkaufslisten-Modul: Grocy + Buy Me a Pie + Lokaler Speicher + Synchronisation."""
 import json
+import logging
 from pathlib import Path
 from typing import Optional
 from datetime import datetime
 from .shopping_sync import shopping_sync
 from .buymeapie import BuyMeAPieClient, create_client
+
+logger = logging.getLogger("shopping")
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 SHOPPING_FILE = DATA_DIR / "shopping.json"
@@ -176,7 +179,7 @@ class GrocyClient:
             
             return filtered
         except Exception as e:
-            print(f"❌ Grocy Shopping List Fehler: {e}")
+            logger.error(f"❌ Grocy Shopping List Fehler: {e}")
             return []
 
     def add_to_shopping_list(self, product_name: str, amount: int = 1, list_id: int = 1) -> str:
@@ -285,7 +288,7 @@ class ShoppingManager:
             self._grocy.get_stock()
             return True
         except Exception as e:
-            print(f"Grocy Verbindung fehlgeschlagen: {e}")
+            logger.error(f"Grocy Verbindung fehlgeschlagen: {e}")
             self._grocy = None
             return False
 
@@ -295,7 +298,7 @@ class ShoppingManager:
             self._bap = create_client(username, password)
             return self._bap is not None
         except Exception as e:
-            print(f"Buy Me a Pie Verbindung fehlgeschlagen: {e}")
+            logger.error(f"Buy Me a Pie Verbindung fehlgeschlagen: {e}")
             self._bap = None
             return False
 
