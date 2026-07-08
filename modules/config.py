@@ -1,6 +1,5 @@
 """Verschlüsselte Konfigurations- und Zugangsdaten-Verwaltung."""
 import json
-import os
 import secrets
 from pathlib import Path
 from cryptography.fernet import Fernet

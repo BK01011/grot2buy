@@ -140,6 +140,13 @@ class BuyMeAPieClient:
             print(f"❌ BAP Kauf-Markierung fehlgeschlagen: {e}")
             return False
 
+    def close(self):
+        """Schließt die Session und gibt Verbindungen frei."""
+        try:
+            self.session.close()
+        except Exception:
+            pass
+
     def get_items_as_text(self, list_id: Optional[str] = None) -> str:
         """Holt die Einkaufsliste als formatierten Text — nur offene Artikel."""
         lists = self.get_lists()

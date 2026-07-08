@@ -15,7 +15,7 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 from datetime import datetime
 
-VERSION = "0.3.0"
+VERSION = "0.3.1"
 
 # Logging
 logging.basicConfig(
@@ -30,8 +30,6 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, File
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.cors import CORSMiddleware
-import httpx
-
 from modules.config import config, DATA_DIR, encrypt
 from modules.shopping import shopping_manager
 from modules.shopping_sync import shopping_sync
@@ -119,7 +117,7 @@ def verify_token(request: Request) -> bool:
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
         return config.validate_token(auth_header[7:])
-    return False
+    raise HTTPException(status_code=401, detail="Unauthorized")
 
 
 @asynccontextmanager
@@ -148,6 +146,8 @@ async def lifespan(app: FastAPI):
     sync_task = asyncio.create_task(_background_sync())
     yield
     sync_task.cancel()
+    if shopping_manager._bap:
+        shopping_manager._bap.close()
     logger.info("👋 Server beendet.")
 
 

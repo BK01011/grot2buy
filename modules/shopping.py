@@ -129,25 +129,24 @@ class GrocyClient:
     """Grocy API Client — Einkaufsliste + Bestand."""
 
     def __init__(self, base_url: str, api_key: str):
+        import httpx
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self._headers = {"GROCY-API-KEY": api_key}
+        self._client = httpx.Client(timeout=10)
 
     def _get(self, endpoint: str):
-        import httpx
-        resp = httpx.get(f"{self.base_url}/api/{endpoint}", headers=self._headers, timeout=10)
+        resp = self._client.get(f"{self.base_url}/api/{endpoint}", headers=self._headers)
         resp.raise_for_status()
         return resp.json()
 
     def _post(self, endpoint: str, data: dict):
-        import httpx
-        resp = httpx.post(f"{self.base_url}/api/{endpoint}", headers=self._headers, json=data, timeout=10)
+        resp = self._client.post(f"{self.base_url}/api/{endpoint}", headers=self._headers, json=data)
         resp.raise_for_status()
         return resp.json() if resp.text else {}
 
     def _delete(self, endpoint: str) -> bool:
-        import httpx
-        resp = httpx.delete(f"{self.base_url}/api/{endpoint}", headers=self._headers, timeout=10)
+        resp = self._client.delete(f"{self.base_url}/api/{endpoint}", headers=self._headers)
         return resp.status_code in (200, 204)
 
     def get_shopping_list(self, list_id: int = 1, include_done: bool = False) -> list:
@@ -182,7 +181,6 @@ class GrocyClient:
 
     def add_to_shopping_list(self, product_name: str, amount: int = 1, list_id: int = 1) -> str:
         try:
-            import httpx
             # First find or create the product
             products = self._get("objects/products")
             product = next((p for p in products if p.get("name", "").lower() == product_name.lower()), None)
@@ -193,20 +191,18 @@ class GrocyClient:
                 loc_id = locations[0]["id"] if locations else 1
                 qu = self._get("objects/quantity_units")
                 qu_id = qu[0]["id"] if qu else 1
-                resp = httpx.post(f"{self.base_url}/api/objects/products",
+                resp = self._client.post(f"{self.base_url}/api/objects/products",
                     headers={**self._headers, "Content-Type": "application/json"},
-                    json={"name": product_name, "qu_id_purchase": qu_id, "qu_id_stock": qu_id, "location_id": loc_id},
-                    timeout=10)
+                    json={"name": product_name, "qu_id_purchase": qu_id, "qu_id_stock": qu_id, "location_id": loc_id})
                 resp.raise_for_status()
                 product_id = resp.json()["created_object_id"]
             else:
                 product_id = product["id"]
 
             # Insert into shopping_list directly
-            resp = httpx.post(f"{self.base_url}/api/objects/shopping_list",
+            resp = self._client.post(f"{self.base_url}/api/objects/shopping_list",
                 headers={**self._headers, "Content-Type": "application/json"},
-                json={"product_id": int(product_id), "amount": amount, "shopping_list_id": list_id, "done": 0, "qu_id": 1},
-                timeout=10)
+                json={"product_id": int(product_id), "amount": amount, "shopping_list_id": list_id, "done": 0, "qu_id": 1})
             resp.raise_for_status()
             return f"✅ '{product_name}' zu Grocy hinzugefügt."
         except Exception as e:
@@ -222,10 +218,9 @@ class GrocyClient:
     def mark_done(self, item_id: int) -> bool:
         """Markiert einen Einkaufslisten-Artikel als erledigt."""
         try:
-            import httpx
-            resp = httpx.put(f"{self.base_url}/api/objects/shopping_list/{item_id}",
+            resp = self._client.put(f"{self.base_url}/api/objects/shopping_list/{item_id}",
                 headers={**self._headers, "Content-Type": "application/json"},
-                json={"done": 1}, timeout=10)
+                json={"done": 1})
             return resp.status_code in (200, 204)
         except Exception:
             return False
@@ -233,10 +228,9 @@ class GrocyClient:
     def revert_done(self, item_id: int) -> bool:
         """Setzt den 'erledigt'-Status eines Einkaufslisten-Artikels zurück."""
         try:
-            import httpx
-            resp = httpx.put(f"{self.base_url}/api/objects/shopping_list/{item_id}",
+            resp = self._client.put(f"{self.base_url}/api/objects/shopping_list/{item_id}",
                 headers={**self._headers, "Content-Type": "application/json"},
-                json={"done": 0}, timeout=10)
+                json={"done": 0})
             return resp.status_code in (200, 204)
         except Exception:
             return False

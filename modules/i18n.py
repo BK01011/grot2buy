@@ -9,16 +9,22 @@ from pathlib import Path
 I18N_DIR = Path(__file__).parent.parent / "i18n"
 AVAILABLE_LANGUAGES = ["de", "en"]
 
+MAX_CACHED_LANGUAGES = 10
 _cache: dict[str, dict] = {}
+_cache_order: list[str] = []
 
 def _load(lang: str) -> dict:
     lang = lang or "de"
     if lang not in _cache:
+        if len(_cache) >= MAX_CACHED_LANGUAGES:
+            oldest = _cache_order.pop(0)
+            _cache.pop(oldest, None)
         path = I18N_DIR / f"{lang}.json"
         if path.exists():
             _cache[lang] = json.loads(path.read_text())
         else:
             _cache[lang] = {}
+        _cache_order.append(lang)
     return _cache[lang]
 
 def flattened(lang: str) -> dict[str, str]:
@@ -64,3 +70,4 @@ def t(key: str, lang: str = "de", **kwargs) -> str:
 def reload():
     """Leert den Cache – beim nächsten t()-Aufruf wird neu geladen."""
     _cache.clear()
+    _cache_order.clear()

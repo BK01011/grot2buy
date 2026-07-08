@@ -14,6 +14,7 @@ class ShoppingSync:
     def __init__(self):
         self._synced_items: list[dict] = []
         self._removed: list[str] = []
+        self._removed_set: set[str] = set()
         self.load()
 
     def load(self):
@@ -30,14 +31,17 @@ class ShoppingSync:
                 else:
                     self._synced_items = data.get("items", [])
                     self._removed = data.get("removed", [])
+                self._removed_set = {self._norm(r) for r in self._removed}
             except Exception:
                 self._synced_items = []
                 self._removed = []
+                self._removed_set = set()
 
     def save(self):
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         try:
             from .config import encrypt
+            self._removed_set = {self._norm(r) for r in self._removed}
             payload = {"items": self._synced_items, "removed": self._removed}
             SYNC_FILE.write_text(encrypt(json.dumps(payload, ensure_ascii=False)))
         except Exception:
@@ -54,7 +58,7 @@ class ShoppingSync:
         return None
 
     def _is_removed(self, name: str) -> bool:
-        return self._norm(name) in {self._norm(r) for r in self._removed}
+        return self._norm(name) in self._removed_set
 
     # ─── Sync ──────────────────────────────────────────────────
 
@@ -356,6 +360,7 @@ class ShoppingSync:
             if not item.get("purchased"):
                 all_active.add(self._norm(item["name"]))
         self._removed = [r for r in self._removed if self._norm(r) not in all_active]
+        self._removed_set = {self._norm(r) for r in self._removed}
 
         self.save()
 
@@ -377,7 +382,9 @@ class ShoppingSync:
 
     def add_item(self, name: str, quantity: int = 1, category: str = "", source: str = "manual") -> str:
         if self._is_removed(name):
-            self._removed = [r for r in self._removed if self._norm(r) != self._norm(name)]
+            nn = self._norm(name)
+            self._removed = [r for r in self._removed if self._norm(r) != nn]
+            self._removed_set.discard(nn)
         existing = self._find(name)
         if existing:
             existing["quantity"] = existing.get("quantity", 1) + quantity
@@ -392,6 +399,7 @@ class ShoppingSync:
 
     def remove_item(self, name: str, bap_client=None, grocy_client=None) -> str:
         self._removed.append(name)
+        self._removed_set.add(self._norm(name))
         before = len(self._synced_items)
         self._synced_items = [i for i in self._synced_items if self._norm(i.get("name", "")) != self._norm(name)]
         removed = before - len(self._synced_items)
