@@ -5,6 +5,26 @@
 Grot2Buy verbindet deine Einkaufslisten-Dienste zu einer zentralen Liste. Änderungen in
 einer Quelle werden automatisch in die anderen propagiert – **wer geändert hat, gewinnt**.
 
+## PWA (iOS / Android)
+
+Grot2Buy ist eine **Progressive Web App** – auf dem Homescreen installierbar,
+läuft im Vollbildmodus ohne Browser-Chrome.
+
+### iOS installieren
+
+1. Safari öffnen → `https://<deine-ip>:8899`
+2. **Teilen-Button** (Mitte der unteren Leiste)
+3. **"Zum Home-Bildschirm"** tippen
+4. Name bestätigen → **"Hinzufügen"**
+5. App-Icon erscheint auf dem Homescreen – wie eine native App
+
+### Android installieren
+
+Chrome zeigt beim ersten Besuch einen Install-Banner an,
+oder via Menü → "Installieren".
+
+---
+
 ## Features
 
 - **Bidirektionaler Sync** – Grocy ↔ Grot2Buy ↔ Buy Me a Pie
