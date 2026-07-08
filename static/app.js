@@ -100,19 +100,47 @@ if ('serviceWorker' in navigator) {
     });
 }
 
+let lastSyncOk = false;
+let lastSyncTime = null;
+
+function updateSyncStatus(ok, timeStr) {
+    const led = document.getElementById('syncLed');
+    const time = document.getElementById('syncTime');
+    if (!led || !time) return;
+    if (ok) {
+        led.className = 'sync-led sync-led--green';
+        time.textContent = timeStr || __('sync.status_ok');
+    } else {
+        led.className = 'sync-led sync-led--gray';
+        time.textContent = __('sync.status_never');
+    }
+}
+
+function formatTime(iso) {
+    const d = new Date(iso);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     applyTheme(localStorage.getItem('grot2buy_theme') || 'auto');
     updateDarkModeBtn();
     requestNotificationPermission();
 
-    // Immer einen initialen Sync ausführen — das befüllt die synced-Liste
-    // UND aktualisiert die BAP-Listenzähler (über /api/lists).
-    // Vor dem Start: MUSS syncWithBAP statt loadItems laufen, weil
-    // der Sync erst die Daten aus BAP/Grocy holen muss.
+    const lastSync = localStorage.getItem('grot2buy_last_sync');
+    if (lastSync) {
+        updateSyncStatus(true, formatTime(lastSync));
+    }
+
     try {
         await api('/sync/full');
+        const now = new Date().toISOString();
+        localStorage.setItem('grot2buy_last_sync', now);
+        updateSyncStatus(true, formatTime(now));
+        lastSyncOk = true;
+        lastSyncTime = now;
     } catch (e) {
         console.error('Initial sync failed:', e);
+        updateSyncStatus(false);
     }
 
     await Promise.all([
@@ -121,6 +149,38 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadItems(),
     ]);
 });
+
+// ─── Pull to Refresh ─────────────────────────────────────────
+
+(function() {
+    let startY = 0;
+    let pulling = false;
+    const threshold = 100;
+    const app = document.querySelector('.app');
+
+    app.addEventListener('touchstart', (e) => {
+        if (window.scrollY > 0) return;
+        startY = e.touches[0].clientY;
+        pulling = true;
+    }, { passive: true });
+
+    app.addEventListener('touchmove', (e) => {
+        if (!pulling) return;
+        const dy = e.touches[0].clientY - startY;
+        if (dy > 20) {
+            e.preventDefault();
+        }
+    }, { passive: false });
+
+    app.addEventListener('touchend', (e) => {
+        if (!pulling) return;
+        pulling = false;
+        const dy = e.changedTouches[0].clientY - startY;
+        if (dy > threshold) {
+            syncWithBAP();
+        }
+    }, { passive: true });
+})();
 
 // ─── API Helpers ─────────────────────────────────────────────
 
@@ -424,7 +484,11 @@ function changeQuantity(delta) {
 
 async function syncWithBAP() {
     const btn = document.getElementById('syncBtn');
+    const led = document.getElementById('syncLed');
+    const time = document.getElementById('syncTime');
     btn.classList.add('syncing');
+    if (led) led.className = 'sync-led sync-led--yellow';
+    if (time) time.textContent = __('sync.status_syncing');
     toast( __('sync.start') );
 
     try {
@@ -432,9 +496,13 @@ async function syncWithBAP() {
         toast(res.result);
         await loadLists();
         await loadItems();
+        const now = new Date().toISOString();
+        localStorage.setItem('grot2buy_last_sync', now);
+        updateSyncStatus(true, formatTime(now));
     } catch (e) {
         toast( __('sync.failed') );
         sendNotification(__('notify.sync_error'), __('notify.sync_error_body', { status: e.message }));
+        if (led) led.className = 'sync-led sync-led--red';
     } finally {
         btn.classList.remove('syncing');
     }

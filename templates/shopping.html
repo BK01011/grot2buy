@@ -22,6 +22,10 @@
                 <span class="item-count" id="itemCount">0</span>
             </div>
             <div class="header-right">
+                <div class="sync-status" id="syncStatus" title="{{ t('sync.status_never') }}">
+                    <span class="sync-led sync-led--gray" id="syncLed"></span>
+                    <span class="sync-time" id="syncTime">{{ t('sync.status_never') }}</span>
+                </div>
                 <button class="btn-icon" onclick="syncWithBAP()" title="{{ t('header.sync') }}" id="syncBtn">
                     <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
