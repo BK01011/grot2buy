@@ -5,6 +5,8 @@ from typing import Optional
 
 logger = logging.getLogger("shopping")
 
+_REQUEST_TIMEOUT = (10, 30)  # (connect, read) in Sekunden
+
 
 class BuyMeAPieClient:
     """Client für Buy Me a Pie Einkaufslisten-App."""
@@ -23,10 +25,26 @@ class BuyMeAPieClient:
         self.session.auth = (username, password)
         self._logged_in = False
 
+    def _get(self, url: str) -> requests.Response:
+        """GET mit Timeout."""
+        return self.session.get(url, timeout=_REQUEST_TIMEOUT)
+
+    def _put(self, url: str, json: dict = None) -> requests.Response:
+        """PUT mit Timeout."""
+        return self.session.put(url, json=json, timeout=_REQUEST_TIMEOUT)
+
+    def _post(self, url: str, json: dict = None) -> requests.Response:
+        """POST mit Timeout."""
+        return self.session.post(url, json=json, timeout=_REQUEST_TIMEOUT)
+
+    def _delete(self, url: str) -> requests.Response:
+        """DELETE mit Timeout."""
+        return self.session.delete(url, timeout=_REQUEST_TIMEOUT)
+
     def login(self) -> bool:
         """Login bei Buy Me a Pie."""
         try:
-            resp = self.session.get(f"{self.BASE_URL}/bauth")
+            resp = self._get(f"{self.BASE_URL}/bauth")
             if resp.status_code == 200:
                 self._logged_in = True
                 return True
@@ -43,7 +61,7 @@ class BuyMeAPieClient:
         """Holt alle Einkaufslisten."""
         self._ensure_login()
         try:
-            resp = self.session.get(f"{self.BASE_URL}/lists")
+            resp = self._get(f"{self.BASE_URL}/lists")
             if resp.status_code == 200:
                 return resp.json()
             return []
@@ -55,7 +73,7 @@ class BuyMeAPieClient:
         """Holt alle Artikel einer Liste."""
         self._ensure_login()
         try:
-            resp = self.session.get(f"{self.BASE_URL}/lists/{list_id}/items")
+            resp = self._get(f"{self.BASE_URL}/lists/{list_id}/items")
             if resp.status_code == 200:
                 return resp.json()
             return []
@@ -91,7 +109,7 @@ class BuyMeAPieClient:
                 "title": name,
                 "amount": f"{quantity}×" if quantity > 1 else "",
             }
-            resp = self.session.post(f"{self.BASE_URL}/lists/{list_id}/items", json=data)
+            resp = self._post(f"{self.BASE_URL}/lists/{list_id}/items", json=data)
             return "added" if resp.status_code in (200, 201) else "error"
         except Exception as e:
             logger.error(f"❌ BAP Hinzufügen fehlgeschlagen: {e}")
@@ -123,7 +141,7 @@ class BuyMeAPieClient:
         """Löscht einen Artikel."""
         self._ensure_login()
         try:
-            resp = self.session.delete(f"{self.BASE_URL}/lists/{list_id}/items/{item_id}")
+            resp = self._delete(f"{self.BASE_URL}/lists/{list_id}/items/{item_id}")
             return resp.status_code in (200, 204)
         except Exception as e:
             logger.error(f"❌ BAP Löschen fehlgeschlagen: {e}")
@@ -134,7 +152,7 @@ class BuyMeAPieClient:
         self._ensure_login()
         try:
             url = f"{self.BASE_URL}/lists/{list_id}/items/{item_id}"
-            resp = self.session.put(url, json={"is_purchased": True})
+            resp = self._put(url, json={"is_purchased": True})
             return resp.status_code in (200, 204)
         except Exception as e:
             logger.error(f"❌ BAP Kauf-Markierung fehlgeschlagen: {e}")

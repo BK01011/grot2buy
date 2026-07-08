@@ -11,10 +11,11 @@ import hashlib
 import logging
 import asyncio
 from pathlib import Path
+from typing import Optional
 from contextlib import asynccontextmanager
 from datetime import datetime
 
-VERSION = "0.4.0"
+VERSION = "0.4.1"
 
 # Logging
 logging.basicConfig(
@@ -32,7 +33,7 @@ from starlette.middleware.cors import CORSMiddleware
 from modules.config import config, DATA_DIR, encrypt
 from modules.shopping import shopping_manager
 from modules.shopping_sync import shopping_sync
-from modules.buymeapie import create_client
+from modules.buymeapie import create_client, BuyMeAPieClient
 from modules.i18n import t as i18n_t, flattened as i18n_flat, AVAILABLE_LANGUAGES
 
 BASE_DIR = Path(__file__).parent
@@ -239,18 +240,25 @@ async def setup(
 
 # ─── API: Listen ────────────────────────────────────────────────
 
+def _ensure_bap_client() -> Optional[BuyMeAPieClient]:
+    """Recycelt den bestehenden BAP-Client oder erzeugt einen neuen."""
+    if shopping_manager._bap:
+        return shopping_manager._bap
+    bap_user = config.get_decrypted("bap_user", "")
+    bap_pass = config.get_decrypted("bap_pass", "")
+    if bap_user and bap_pass:
+        shopping_manager.configure_buymeapie(bap_user, bap_pass)
+        return shopping_manager._bap
+    return None
+
+
 @app.get("/api/lists")
 async def api_lists(_: bool = Depends(verify_token)):
     """Zeigt alle BAP-Listen."""
     try:
-        bap_user = config.get_decrypted("bap_user", "")
-        bap_pass = config.get_decrypted("bap_pass", "")
-        if not bap_user or not bap_pass:
-            return JSONResponse({"lists": [], "error": "Keine BAP-Zugangsdaten"})
-
-        client = create_client(bap_user, bap_pass)
+        client = _ensure_bap_client()
         if not client:
-            return JSONResponse({"lists": [], "error": "BAP-Verbindung fehlgeschlagen"})
+            return JSONResponse({"lists": [], "error": "Keine BAP-Verbindung"})
 
         lists = client.get_lists()
         result = []
@@ -272,14 +280,9 @@ async def api_lists(_: bool = Depends(verify_token)):
 async def api_list_items(list_id: str, _: bool = Depends(verify_token)):
     """Zeigt Artikel einer bestimmten BAP-Liste."""
     try:
-        bap_user = config.get_decrypted("bap_user", "")
-        bap_pass = config.get_decrypted("bap_pass", "")
-        if not bap_user or not bap_pass:
-            return JSONResponse({"items": [], "error": "Keine BAP-Zugangsdaten"})
-
-        client = create_client(bap_user, bap_pass)
+        client = _ensure_bap_client()
         if not client:
-            return JSONResponse({"items": [], "error": "BAP-Verbindung fehlgeschlagen"})
+            return JSONResponse({"items": [], "error": "Keine BAP-Verbindung"})
 
         items = client.get_active_items(list_id)
         result = []

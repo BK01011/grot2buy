@@ -88,9 +88,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateDarkModeBtn();
     requestNotificationPermission();
     watchSyncErrors();
-    await loadCategories();
-    await loadLists();
-    await loadItems();
+
+    // Parallele API-Calls statt sequentiell — loadItems zeigt sofort Spinner,
+    // loadLists blockiert nicht mehr die ganze Seite bei trägem BAP
+    await Promise.all([
+        loadCategories(),
+        loadLists(),
+        loadItems(),
+    ]);
 });
 
 // ─── API Helpers ─────────────────────────────────────────────
