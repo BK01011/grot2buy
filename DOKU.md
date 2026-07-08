@@ -3,6 +3,7 @@
 **Bidirektionale Synchronisation zwischen Buy Me a Pie, Grocy und lokaler Liste**
 
 Autor: **S.B.** | Lizenz: MIT | Erstellt mit KI-Unterstützung
+Dank an: Grocy, Buy Me a Pie, opencode, Claude
 
 ---
 

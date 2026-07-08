@@ -73,6 +73,8 @@ Dieses Tool wurde mit Unterstützung von KI erstellt.
 - **[opencode](https://opencode.ai)** – KI-gestützte Entwicklungsumgebung
 - **Claude** (Anthropic) – Code-Generierung und Architekturberatung
 - Allen beteiligten KI-Systemen, die bei der Umsetzung geholfen haben
+- **Grocy** ([grocy.info](https://grocy.info)) – Das ERP-System für den Haushalt
+- **Buy Me a Pie** ([buymeapie.com](https://buymeapie.com)) – Der mobile Einkaufszettel
 
 ## Lizenz
 
