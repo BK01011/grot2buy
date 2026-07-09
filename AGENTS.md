@@ -1,4 +1,4 @@
-# Grot2Buy v0.11.0
+# Grot2Buy v0.12.0
 
 Bidirektionale Synchronisation zwischen Buy Me a Pie, Grocy und lokaler Einkaufsliste.
 Architektur: Zentrale Liste (synced_items) als Wahrheitsquelle, **wer geändert hat gewinnt** (statt "Grocy immer").
@@ -79,5 +79,9 @@ Papierkorb, Undo-Toast, API-Endpunkte, Sync v2
 
 `0.10.0` — Kategoriesortierung im UI (grouped by category,
 alphabetisch sortiert, category-header)
+
+`0.11.0` — Offline-Modus (SW-Cache, Write-Queue, Badge)
+
+`0.12.0` — API-Dokumentation (Swagger/OpenAPI, Tags, Security)
 
 Autor: S.B. | Lizenz: MIT | Erstellt mit KI-Unterstützung (opencode, Claude)

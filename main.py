@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-VERSION = "0.11.0"
+VERSION = "0.12.0"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -28,6 +28,7 @@ logging.basicConfig(
 logger = logging.getLogger("shopping")
 
 from fastapi import FastAPI, Request, Form, Depends, HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -208,7 +209,32 @@ async def _background_sync():
             await asyncio.sleep(60)
 
 
-app = FastAPI(title="Grot2Buy", lifespan=lifespan)
+tags_metadata = [
+    {"name": "Items", "description": "CRUD für Einkaufslisten-Artikel"},
+    {"name": "Sync", "description": "Synchronisation mit Grocy und Buy Me a Pie"},
+    {"name": "Trash", "description": "Papierkorb (gelöschte Items wiederherstellen)"},
+    {"name": "Config", "description": "App-Konfiguration verwalten"},
+    {"name": "System", "description": "System-Status und Health-Check"},
+    {"name": "WebSocket", "description": "Live-Updates via WebSocket"},
+    {"name": "Docs", "description": "Dokumentation und Changelog"},
+]
+
+app = FastAPI(
+    title="Grot2Buy",
+    description="Bidirektionale Synchronisation zwischen Buy Me a Pie, Grocy und lokaler Einkaufsliste.\n\n"
+                "Authentifizierung via Bearer Token (`Authorization: Bearer <token>`).\n"
+                "WebSocket unter `/ws` für Live-Updates.",
+    version=VERSION,
+    lifespan=lifespan,
+    openapi_tags=tags_metadata,
+    contact={"name": "S.B.", "url": "https://github.com/BK01011/grot2buy"},
+    license_info={"name": "MIT", "url": "https://github.com/BK01011/grot2buy/blob/main/LICENSE"},
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    swagger_ui_parameters={"persistAuthorization": True},
+)
+
+security_scheme = HTTPBearer(auto_error=False)
 
 
 @app.exception_handler(StarletteHTTPException)
@@ -328,7 +354,7 @@ def _ensure_bap_client() -> Optional[BuyMeAPieClient]:
     return None
 
 
-@app.get("/api/lists")
+@app.get("/api/lists", tags=["Items"])
 async def api_lists(_: bool = Depends(verify_token)):
     synced_count = 0
     try:
@@ -364,7 +390,7 @@ async def api_lists(_: bool = Depends(verify_token)):
         return JSONResponse({"lists": [], "synced_count": synced_count, "grocy_count": grocy_count, "error": "Fehler beim Laden der Listen"})
 
 
-@app.get("/api/lists/{list_id}/items")
+@app.get("/api/lists/{list_id}/items", tags=["Items"])
 async def api_list_items(list_id: str, _: bool = Depends(verify_token)):
     try:
         client = _ensure_bap_client()
@@ -397,7 +423,7 @@ async def api_list_items(list_id: str, _: bool = Depends(verify_token)):
 
 # ─── API: Artikel verwalten ────────────────────────────────────
 
-@app.post("/api/items/add")
+@app.post("/api/items/add", tags=["Items"])
 async def api_add_item(request: Request, _: bool = Depends(verify_token)):
     body = await parse_json_body(request)
     name = body.get("name", "").strip()
@@ -419,7 +445,7 @@ async def api_add_item(request: Request, _: bool = Depends(verify_token)):
     })
 
 
-@app.post("/api/items/add-bulk")
+@app.post("/api/items/add-bulk", tags=["Items"])
 async def api_add_items_bulk(request: Request, _: bool = Depends(verify_token)):
     body = await parse_json_body(request)
     items_text = body.get("items", "")
@@ -459,7 +485,7 @@ async def api_add_items_bulk(request: Request, _: bool = Depends(verify_token)):
     })
 
 
-@app.post("/api/items/{item_name}/remove")
+@app.post("/api/items/{item_name}/remove", tags=["Items"])
 async def api_remove_item(item_name: str, _: bool = Depends(verify_token)):
     bap_client = shopping_manager._bap
     grocy_client = shopping_manager._grocy if shopping_manager._grocy else None
@@ -469,13 +495,13 @@ async def api_remove_item(item_name: str, _: bool = Depends(verify_token)):
     return JSONResponse({"result": result})
 
 
-@app.get("/api/trash/items")
+@app.get("/api/trash/items", tags=["Trash"])
 async def api_trash_items(_: bool = Depends(verify_token)):
     items = shopping_sync.get_trash()
     return JSONResponse({"items": items, "count": len(items)})
 
 
-@app.post("/api/trash/restore/{item_name}")
+@app.post("/api/trash/restore/{item_name}", tags=["Trash"])
 async def api_trash_restore(item_name: str, _: bool = Depends(verify_token)):
     result = await shopping_sync.restore_item(item_name)
     logger.info(f"Wiederhergestellt: {item_name}")
@@ -483,7 +509,7 @@ async def api_trash_restore(item_name: str, _: bool = Depends(verify_token)):
     return JSONResponse({"result": result})
 
 
-@app.post("/api/trash/empty")
+@app.post("/api/trash/empty", tags=["Trash"])
 async def api_trash_empty(_: bool = Depends(verify_token)):
     bap_client = shopping_manager._bap
     grocy_client = shopping_manager._grocy if shopping_manager._grocy else None
@@ -493,7 +519,7 @@ async def api_trash_empty(_: bool = Depends(verify_token)):
     return JSONResponse({"result": result})
 
 
-@app.post("/api/items/{item_name}/purchased")
+@app.post("/api/items/{item_name}/purchased", tags=["Items"])
 async def api_mark_purchased(item_name: str, _: bool = Depends(verify_token)):
     bap_client = shopping_manager._bap
     grocy_client = shopping_manager._grocy if shopping_manager._grocy else None
@@ -504,7 +530,7 @@ async def api_mark_purchased(item_name: str, _: bool = Depends(verify_token)):
     return JSONResponse({"result": result})
 
 
-@app.post("/api/items/{item_name}/quantity")
+@app.post("/api/items/{item_name}/quantity", tags=["Items"])
 async def api_update_quantity(item_name: str, request: Request, _: bool = Depends(verify_token)):
     body = await parse_json_body(request)
     quantity = body.get("quantity", 1)
@@ -531,7 +557,7 @@ async def api_update_quantity(item_name: str, request: Request, _: bool = Depend
     return JSONResponse({"result": msg})
 
 
-@app.post("/api/items/clear-purchased")
+@app.post("/api/items/clear-purchased", tags=["Items"])
 async def api_clear_purchased(_: bool = Depends(verify_token)):
     result = await shopping_sync.clear_purchased()
     logger.info(f"Gekaufte Artikel bereinigt: {result}")
@@ -541,7 +567,7 @@ async def api_clear_purchased(_: bool = Depends(verify_token)):
 
 # ─── API: BAP-Synchronisation ──────────────────────────────────
 
-@app.get("/api/sync/push")
+@app.get("/api/sync/push", tags=["Sync"])
 async def api_sync_push(_: bool = Depends(verify_token)):
     try:
         client = shopping_manager._bap
@@ -555,7 +581,7 @@ async def api_sync_push(_: bool = Depends(verify_token)):
         return JSONResponse({"result": "Fehler beim Push-Sync"})
 
 
-@app.get("/api/sync/pull")
+@app.get("/api/sync/pull", tags=["Sync"])
 async def api_sync_pull(_: bool = Depends(verify_token)):
     try:
         client = shopping_manager._bap
@@ -570,7 +596,7 @@ async def api_sync_pull(_: bool = Depends(verify_token)):
         return JSONResponse({"result": "Fehler beim Pull-Sync"})
 
 
-@app.get("/api/sync/full")
+@app.get("/api/sync/full", tags=["Sync"])
 async def api_sync_full(_: bool = Depends(verify_token)):
     try:
         bap_client = shopping_manager._bap
@@ -593,7 +619,7 @@ async def api_sync_full(_: bool = Depends(verify_token)):
         return JSONResponse({"result": "Fehler bei der Synchronisation"})
 
 
-@app.get("/api/sync/grocy")
+@app.get("/api/sync/grocy", tags=["Sync"])
 async def api_sync_grocy(_: bool = Depends(verify_token)):
     grocy = shopping_manager._grocy
     if not grocy:
@@ -607,7 +633,7 @@ async def api_sync_grocy(_: bool = Depends(verify_token)):
     return JSONResponse({"items": result, "count": len(result)})
 
 
-@app.get("/api/sync/grocy/push")
+@app.get("/api/sync/grocy/push", tags=["Sync"])
 async def api_sync_grocy_push(_: bool = Depends(verify_token)):
     grocy = shopping_manager._grocy
     if not grocy:
@@ -621,7 +647,7 @@ async def api_sync_grocy_push(_: bool = Depends(verify_token)):
         return JSONResponse({"result": "Fehler beim Grocy-Push"})
 
 
-@app.get("/api/sync/grocy/pull")
+@app.get("/api/sync/grocy/pull", tags=["Sync"])
 async def api_sync_grocy_pull(_: bool = Depends(verify_token)):
     grocy = shopping_manager._grocy
     if not grocy:
@@ -646,12 +672,12 @@ async def api_sync_grocy_pull(_: bool = Depends(verify_token)):
 
 # ─── API: Daten ────────────────────────────────────────────────
 
-@app.get("/api/synced")
+@app.get("/api/synced", tags=["Sync"])
 async def api_synced(_: bool = Depends(verify_token)):
     return JSONResponse({"text": shopping_sync.get_merged_text()})
 
 
-@app.get("/api/synced/items")
+@app.get("/api/synced/items", tags=["Sync"])
 async def api_synced_items(_: bool = Depends(verify_token)):
     if not shopping_sync._synced_items and (shopping_manager._bap or shopping_manager._grocy):
         logger.info("Synced-Liste leer → initialer Auto-Sync")
@@ -690,7 +716,7 @@ async def api_synced_items(_: bool = Depends(verify_token)):
     })
 
 
-@app.post("/api/synced/reset")
+@app.post("/api/synced/reset", tags=["Sync"])
 async def api_synced_reset(_: bool = Depends(verify_token)):
     shopping_sync._synced_items = []
     shopping_sync._removed = []
@@ -712,7 +738,7 @@ async def api_categories(_: bool = Depends(verify_token)):
 
 # ─── API: Konfiguration ───────────────────────────────────────
 
-@app.get("/api/config")
+@app.get("/api/config", tags=["Config"])
 async def api_config_get(_: bool = Depends(verify_token)):
     return JSONResponse({
         "bap_user": config.get_decrypted("bap_user", ""),
@@ -723,7 +749,7 @@ async def api_config_get(_: bool = Depends(verify_token)):
     })
 
 
-@app.post("/api/config/bap")
+@app.post("/api/config/bap", tags=["Config"])
 async def api_config_bap(request: Request, _: bool = Depends(verify_token)):
     body = await parse_json_body(request)
     bap_user = body.get("bap_user", "")
@@ -739,13 +765,13 @@ async def api_config_bap(request: Request, _: bool = Depends(verify_token)):
     return JSONResponse({"result": i18n_t("config.bap_updated", lang)})
 
 
-@app.get("/api/config/sync-interval")
+@app.get("/api/config/sync-interval", tags=["Config"])
 async def api_get_sync_interval(_: bool = Depends(verify_token)):
     interval = config.get("sync_interval", 5)
     return JSONResponse({"interval": interval})
 
 
-@app.post("/api/config/sync-interval")
+@app.post("/api/config/sync-interval", tags=["Config"])
 async def api_set_sync_interval(request: Request, _: bool = Depends(verify_token)):
     body = await parse_json_body(request)
     interval = body.get("interval", 5)
@@ -760,13 +786,13 @@ async def api_set_sync_interval(request: Request, _: bool = Depends(verify_token
     return JSONResponse({"result": msg, "interval": int(interval)})
 
 
-@app.get("/api/config/lang")
+@app.get("/api/config/lang", tags=["Config"])
 async def api_get_lang(_: bool = Depends(verify_token)):
     lang = config.get("lang", "de")
     return JSONResponse({"lang": lang, "available": AVAILABLE_LANGUAGES})
 
 
-@app.post("/api/config/lang")
+@app.post("/api/config/lang", tags=["Config"])
 async def api_set_lang(request: Request, _: bool = Depends(verify_token)):
     body = await parse_json_body(request)
     lang = body.get("lang", "de")
@@ -777,7 +803,7 @@ async def api_set_lang(request: Request, _: bool = Depends(verify_token)):
     return JSONResponse({"success": True, "lang": lang})
 
 
-@app.get("/api/config/export")
+@app.get("/api/config/export", tags=["Config"])
 async def api_config_export(_: bool = Depends(verify_token)):
     REDACTED = "***"
     safe_config = {}
@@ -795,7 +821,7 @@ async def api_config_export(_: bool = Depends(verify_token)):
     })
 
 
-@app.post("/api/config/import")
+@app.post("/api/config/import", tags=["Config"])
 async def api_config_import(request: Request, _: bool = Depends(verify_token)):
     body = await parse_json_body(request)
     config_data = body.get("config", {})
@@ -812,12 +838,12 @@ async def api_config_import(request: Request, _: bool = Depends(verify_token)):
 
 # ─── API: System ───────────────────────────────────────────────
 
-@app.get("/health")
+@app.get("/health", tags=["System"])
 async def health():
     return {"status": "ok", "service": "grot2buy", "version": VERSION}
 
 
-@app.get("/api/system/status")
+@app.get("/api/system/status", tags=["System"])
 async def api_system_status(_: bool = Depends(verify_token)):
     return JSONResponse({
         "status": "running",
@@ -864,12 +890,12 @@ async def websocket_endpoint(websocket: WebSocket):
 
 # ─── API: Downloads ─────────────────────────────────────────────
 
-@app.get("/api/docs/doku")
+@app.get("/api/docs/doku", tags=["Docs"])
 async def download_doku(_: bool = Depends(verify_token)):
     return FileResponse("DOKU.md", media_type="text/markdown", filename="DOKU.md")
 
 
-@app.get("/api/docs/changelog")
+@app.get("/api/docs/changelog", tags=["Docs"])
 async def download_changelog(_: bool = Depends(verify_token)):
     return FileResponse("CHANGELOG.md", media_type="text/markdown", filename="CHANGELOG.md")
 

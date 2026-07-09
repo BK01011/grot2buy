@@ -4,6 +4,23 @@ All changes to Grot2Buy with explanations.
 
 ---
 
+## [0.12.0] — 2026-07-09
+
+### 📖 API-Dokumentation (Swagger/OpenAPI)
+
+English summary: FastAPI auto-generates OpenAPI docs at `/api/docs` and `/api/redoc` with Bearer auth.
+
+- `tags_metadata` with 7 endpoint groups (Items, Sync, Trash, Config, System, WebSocket, Docs)
+- All endpoints tagged for OpenAPI grouping
+- `summary=` description on key API endpoints
+- HTTPBearer security scheme with `persistAuthorization`
+- Metadata: version, contact, license info
+- `docs_url` and `redoc_url` moved to `/api/docs` and `/api/redoc`
+
+**Version**: `0.11.0` → `0.12.0`
+
+---
+
 ## [0.11.0] — 2026-07-09
 
 ### 📴 Offline-Modus
@@ -18,6 +35,25 @@ English summary: offline cache for API reads, write queue replay, offline indica
 
 **Version**: `0.10.0` → `0.11.0`
 
+
+## [0.12.0] — 2026-07-09
+
+### 📖 API-Dokumentation (Swagger/OpenAPI)
+
+**Problem**: Es gab keine strukturierte API-Dokumentation. Entwickler mussten den Source-Code lesen.
+
+**Lösung**: FastAPI OpenAPI-Docs mit Tags, Security-Scheme und Metadaten.
+
+**Backend**:
+-  mit 7 Gruppen (Items, Sync, Trash, Config, System, WebSocket, Docs)
+- Alle Endpoints mit  für OpenAPI-Gruppierung
+-  Security Scheme mit 
+- Metadaten: Version, Contact, License
+-  und  auf  und  gesetzt
+
+**Version**:  → 
+
+---
 ---
 
 ## [0.10.0] — 2026-07-09
