@@ -74,7 +74,8 @@
     "purchased_marked": "✅ '{name}' als gekauft markiert.",
     "updated": "Menge für '{name}' auf x{qty} aktualisiert.",
     "clear_confirm": "Alle erledigten Artikel löschen?",
-    "clear_done": "Alle gekauften Artikel entfernt."
+    "clear_done": "Alle gekauften Artikel entfernt.",
+    "stock": "Bestand: {n}"
   },
   "sync": {
     "start": "Synchronisiere...",

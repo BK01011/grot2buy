@@ -74,7 +74,8 @@
     "purchased_marked": "✅ '{name}' marked as purchased.",
     "updated": "Quantity for '{name}' updated to x{qty}.",
     "clear_confirm": "Delete all purchased items?",
-    "clear_done": "All purchased items removed."
+    "clear_done": "All purchased items removed.",
+    "stock": "Stock: {n}"
   },
   "sync": {
     "start": "Syncing...",

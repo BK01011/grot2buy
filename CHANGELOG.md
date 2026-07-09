@@ -4,6 +4,29 @@ All changes to Grot2Buy with explanations.
 
 ---
 
+## [0.8.0] — 2026-07-09
+
+### 📦 Grocy-Bestand in der UI anzeigen
+
+**Neu**: Bei Artikeln aus der Synced-Liste wird der aktuelle Grocy-Lagerbestand angezeigt (falls vorhanden).
+
+**Backend**:
+- `GrocyClient.get_stock()` — neue Methode: ruft `GET /api/stock` ab und mapped product_id → Name → Bestand
+- `api_synced_items` reichert jedes Item mit `stock`-Feld an (wenn Grocy verbunden)
+- Stock wird als float geliefert (Grocy unterstützt Bruchmengen)
+
+**Frontend**:
+- `renderItem()` zeigt Bestand in der Meta-Zeile an: "Bestand: 3" (DE) / "Stock: 3" (EN)
+- Nur sichtbar wenn Item in Grocy als Produkt existiert und Bestand > 0
+
+**i18n**: Neue Keys `item.stock` in de.json und en.json
+
+**Cache bust**: `?v=12` → `?v=13`, SW-Cache `grot2buy-v12` → `grot2buy-v13`
+
+**Version**: `0.7.0` → `0.8.0`
+
+---
+
 ## [0.7.0] — 2026-07-09
 
 ### 🔌 WebSocket Live-Sync (Push statt Polling)
@@ -400,6 +423,28 @@ value = Fernet(key).decrypt(token.encode()).decode()
 # Changelog — Grot2Buy
 
 Alle Änderungen an Grot2Buy mit Begründungen.
+
+---
+
+## [0.8.0] — 2026-07-09
+
+### 📦 Grocy-Bestand in der UI anzeigen
+
+**Neu**: Bei Artikeln aus der Synced-Liste wird der aktuelle Grocy-Lagerbestand angezeigt (falls vorhanden).
+
+**Backend**:
+- `GrocyClient.get_stock()` — neue Methode: ruft `GET /api/stock` ab und mapped product_id → Name → Bestand
+- `api_synced_items` reichert jedes Item mit `stock`-Feld an (wenn Grocy verbunden)
+
+**Frontend**:
+- `renderItem()` zeigt Bestand in der Meta-Zeile an: "Bestand: 3" / "Stock: 3"
+- Nur sichtbar wenn Item als Produkt in Grocy existiert
+
+**i18n**: Neue Keys `item.stock` in de.json und en.json
+
+**Cache bust**: `?v=12` → `?v=13`, SW-Cache `grot2buy-v12` → `grot2buy-v13`
+
+**Version**: `0.7.0` → `0.8.0`
 
 ---
 

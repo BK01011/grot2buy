@@ -80,6 +80,28 @@ class GrocyClient:
             logger.error(f"Grocy Shopping List Fehler: {e}")
             return []
 
+    def get_stock(self) -> dict[str, float]:
+        """Returns dict of {product_name_lower: stock_amount}."""
+        try:
+            stock_entries = self._get("stock")
+            if not isinstance(stock_entries, list):
+                return {}
+            products = self._get("objects/products")
+            prod_map = {}
+            if isinstance(products, list):
+                prod_map = {p["id"]: p.get("name", "") for p in products}
+            result = {}
+            for entry in stock_entries:
+                pid = entry.get("product_id")
+                amount = entry.get("amount", 0)
+                name = prod_map.get(pid, "")
+                if name:
+                    result[name.lower().strip()] = float(amount)
+            return result
+        except Exception as e:
+            logger.error(f"Grocy Stock Fehler: {e}")
+            return {}
+
     def add_to_shopping_list(self, product_name: str, amount: int = 1, list_id: Optional[int] = None) -> str:
         try:
             if list_id is None:

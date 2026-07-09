@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-VERSION = "0.7.0"
+VERSION = "0.8.0"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -638,6 +638,19 @@ async def api_synced_items(_: bool = Depends(verify_token)):
     all_items = shopping_sync._synced_items[:]
     active = [i for i in all_items if not i.get("purchased")]
     purchased = [i for i in all_items if i.get("purchased")]
+
+    stock_map = {}
+    if shopping_manager._grocy:
+        try:
+            stock_map = shopping_manager._grocy.get_stock()
+        except Exception as e:
+            logger.debug(f"Stock-Fehler: {e}")
+
+    for item in active:
+        nn = shopping_sync._norm(item.get("name", ""))
+        if nn in stock_map:
+            item["stock"] = stock_map[nn]
+
     by_category = {}
     for item in active:
         cat = item.get("category", "") or "Sonstiges"

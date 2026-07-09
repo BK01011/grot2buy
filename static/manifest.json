@@ -10,7 +10,7 @@
   "categories": ["utilities", "shopping", "lifestyle"],
   "icons": [
     {
-      "src": "/static/logo.svg?v=12",
+      "src": "/static/logo.svg?v=13",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"

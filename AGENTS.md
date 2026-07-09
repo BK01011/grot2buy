@@ -1,4 +1,4 @@
-# Grot2Buy v0.6.0
+# Grot2Buy v0.8.0
 
 Bidirektionale Synchronisation zwischen Buy Me a Pie, Grocy und lokaler Einkaufsliste.
 Architektur: Zentrale Liste (synced_items) als Wahrheitsquelle, **wer geändert hat gewinnt** (statt "Grocy immer").
@@ -70,5 +70,8 @@ Regressionstest (16 Endpunkte), Token-Expiry (30 Tage)
 `0.7.0` — WebSocket Live-Sync (Push statt Polling),
 ConnectionManager, `/ws` Endpunkt, Broadcast bei Sync + CRUD,
 Cross-Tab Sync, Auto-Reconnect
+
+`0.8.0` — Grocy-Bestand in UI (api/stock, get_stock(),
+Meta-Zeile mit Bestandszahl, i18n)
 
 Autor: S.B. | Lizenz: MIT | Erstellt mit KI-Unterstützung (opencode, Claude)

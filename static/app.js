@@ -436,12 +436,13 @@ function renderGrocyItems(data) {
 
 function renderItem(item) {
     const qty = item.quantity || 1;
+    const stockHtml = item.stock !== undefined ? ` · ${__('item.stock', {n: item.stock})}` : '';
     return `
         <div class="item" data-name="${escapeHtml(item.name)}">
             <div class="item-check ${item.purchased ? 'checked' : ''}" onclick="togglePurchased('${escapeHtml(item.name)}')"></div>
             <div class="item-info">
                 <div class="item-name">${escapeHtml(item.name)}</div>
-                ${item.category ? `<div class="item-meta">${escapeHtml(item.category)}${item.barcode ? ' · ' + escapeHtml(item.barcode) : ''}</div>` : ''}
+                ${item.category ? `<div class="item-meta">${escapeHtml(item.category)}${stockHtml}</div>` : (stockHtml ? `<div class="item-meta">${stockHtml}</div>` : '')}
             </div>
             <div class="item-quantity">
                 <button class="qty-btn" onclick="changeItemQty('${escapeHtml(item.name)}', -1)">-</button>
