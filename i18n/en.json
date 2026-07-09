@@ -5,11 +5,12 @@
     "settings": "Settings",
     "add": "Add item",
     "darkmode": "Toggle dark mode",
-    "help": "Help"
+    "help": "Help",
+    "scroll_top": "Scroll to top"
   },
   "tab": {
-    "synced": "📋 Synced",
-    "grocy": "📦 Grocy"
+    "synced": "Synced",
+    "grocy": "Grocy"
   },
   "loading": {
     "data": "Loading data..."
@@ -49,7 +50,7 @@
     "bap_save": "Save",
     "sync_section": "Auto-Sync",
     "sync_interval": "Interval (minutes)",
-    "sync_disabled": "0 = disabled",
+    "sync_disabled": "Status updates follow this interval (0 = every 2 min)",
     "sync_save": "Save",
     "lang_section": "Language",
     "lang_label": "Language",
@@ -83,6 +84,7 @@
     "status_never": "Never",
     "status_ok": "Today",
     "status_syncing": "Sync…",
+    "just_now": "Now",
     "pull_start": "Fetching items from Grocy...",
     "pull_success": "{n} items fetched from Grocy.",
     "pull_failed": "Error fetching from Grocy",
@@ -154,7 +156,7 @@
     "usage_qty": "➕/➖ Change quantity: Buttons on the item",
     "usage_remove": "✕ Remove item: X button on the right",
     "usage_sync": "🔄 Sync: Automatic on page load — Sync button for manual re-sync",
-    "usage_status": "● Sync status: Shows last sync time; green=ok, yellow=syncing, red=error",
+    "usage_status": "● Status indicator: Shows last sync time; green=ok, yellow=syncing, red=error",
     "usage_pull": "📱 Pull-to-Refresh: Swipe down on mobile to trigger sync",
     "usage_dark": "🌗 Dark mode: Sun/moon icon top right",
     "usage_pwa": "📲 PWA: Close app (swipe from homescreen) and reopen after update",

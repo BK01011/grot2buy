@@ -1,9 +1,14 @@
 """Verschlüsselte Konfigurations- und Zugangsdaten-Verwaltung."""
 import json
 import secrets
+import os
+import logging
+from datetime import datetime, timezone
 from pathlib import Path
 from cryptography.fernet import Fernet
 from typing import Optional
+
+logger = logging.getLogger("shopping")
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 CONFIG_FILE = DATA_DIR / "config.json"
@@ -15,6 +20,7 @@ def _load_or_create_key() -> bytes:
         return KEY_FILE.read_bytes()
     key = Fernet.generate_key()
     KEY_FILE.write_bytes(key)
+    os.chmod(str(KEY_FILE), 0o600)
     return key
 
 
@@ -29,6 +35,12 @@ def decrypt(token: str) -> str:
     return _fernet.decrypt(token.encode()).decode()
 
 
+def _atomic_write(path: Path, content: str):
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(content, encoding="utf-8")
+    tmp.replace(path)
+
+
 class Config:
     def __init__(self):
         self._data: dict = {}
@@ -36,13 +48,16 @@ class Config:
 
     def load(self):
         if CONFIG_FILE.exists():
-            with open(CONFIG_FILE, "r") as f:
-                self._data = json.load(f)
+            try:
+                with open(CONFIG_FILE, "r") as f:
+                    self._data = json.load(f)
+            except (json.JSONDecodeError, OSError) as e:
+                logger.error(f"Config-Datei korrupt: {e}")
+                self._data = {}
 
     def save(self):
         DATA_DIR.mkdir(parents=True, exist_ok=True)
-        with open(CONFIG_FILE, "w") as f:
-            json.dump(self._data, f, indent=2, ensure_ascii=False)
+        _atomic_write(CONFIG_FILE, json.dumps(self._data, indent=2, ensure_ascii=False))
 
     def get(self, key: str, default=None):
         return self._data.get(key, default)
@@ -141,17 +156,38 @@ class Config:
 
     @property
     def auth_token(self) -> str:
-        return self._data.get("auth_token", "")
+        val = self._data.get("auth_token")
+        if isinstance(val, dict) and val.get("__encrypted__"):
+            return decrypt(val["value"])
+        return str(val) if val else ""
+
+    TOKEN_MAX_AGE_DAYS = 30
 
     def set_auth_token(self, token: str):
-        self._data["auth_token"] = token
+        self._data["auth_token"] = {"__encrypted__": True, "value": encrypt(token)}
+        self._data["auth_token_created_at"] = datetime.now(timezone.utc).isoformat()
         self.save()
 
     def validate_token(self, token: str) -> bool:
         stored = self.auth_token
         if not stored:
             return False
+        created_at = self._data.get("auth_token_created_at")
+        if created_at:
+            try:
+                created = datetime.fromisoformat(created_at)
+                if created.tzinfo is None:
+                    created = created.replace(tzinfo=timezone.utc)
+                if (datetime.now(timezone.utc) - created).days >= self.TOKEN_MAX_AGE_DAYS:
+                    return False
+            except Exception:
+                pass
         return secrets.compare_digest(token, stored)
+
+    def reset_auth_tokens(self):
+        self._data.pop("auth_token", None)
+        self._data.pop("auth_token_created_at", None)
+        self.save()
 
 
 config = Config()

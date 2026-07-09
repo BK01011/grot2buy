@@ -102,6 +102,19 @@ if ('serviceWorker' in navigator) {
 
 let lastSyncOk = false;
 let lastSyncTime = null;
+let syncTimer = null;
+
+function startSyncTimer(intervalMin) {
+    if (syncTimer) clearInterval(syncTimer);
+    const ms = (intervalMin > 0 ? intervalMin : 2) * 60 * 1000;
+    syncTimer = setInterval(refreshPillTime, ms);
+}
+
+function refreshPillTime() {
+    if (!lastSyncTime) return;
+    const text = document.getElementById('pillText');
+    if (text) text.textContent = formatTime(lastSyncTime);
+}
 
 function updateSyncStatus(ok, timeStr) {
     const pill = document.getElementById('syncStatus');
@@ -121,9 +134,21 @@ function updateSyncStatus(ok, timeStr) {
     }
 }
 
+function updatePillAuto(interval) {
+    const el = document.getElementById('pillAuto');
+    if (!el) return;
+    el.textContent = interval && interval > 0 ? interval + 'm' : '';
+}
+
 function formatTime(iso) {
-    const d = new Date(iso);
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (!iso) return '';
+    const now = Date.now();
+    const then = new Date(iso).getTime();
+    const diff = Math.floor((now - then) / 1000);
+    if (diff < 60) return __('sync.just_now');
+    if (diff < 3600) return Math.floor(diff / 60) + 'm';
+    if (diff < 86400) return Math.floor(diff / 3600) + 'h';
+    return Math.floor(diff / 86400) + 'd';
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -134,6 +159,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const lastSync = localStorage.getItem('grot2buy_last_sync');
     if (lastSync) {
         updateSyncStatus(true, formatTime(lastSync));
+    }
+
+    try {
+        const cfg = await api('/config');
+        updatePillAuto(cfg.sync_interval);
+        startSyncTimer(cfg.sync_interval);
+    } catch (e) {
+        startSyncTimer(0);
     }
 
     try {
@@ -244,10 +277,10 @@ async function loadLists() {
         const tabs = document.getElementById('listTabs');
         const lists = data.lists || [];
 
-        let html = '<button class="tab active" data-list="synced" onclick="switchTab(\'synced\', this)">' + __('tab.synced') + '</button>';
-        html += '<button class="tab" data-list="grocy" onclick="switchTab(\'grocy\', this)">' + __('tab.grocy') + '</button>';
+        let html = '<button class="tab active" data-list="synced" onclick="switchTab(\'synced\', this)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>' + __('tab.synced') + ' (' + (data.synced_count || 0) + ')</button>';
+        html += '<button class="tab" data-list="grocy" onclick="switchTab(\'grocy\', this)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>' + __('tab.grocy') + ' (' + (data.grocy_count || 0) + ')</button>';
         for (const list of lists) {
-            html += `<button class="tab" data-list="${list.id}" onclick="switchTab('${list.id}', this)">${list.name} (${list.count})</button>`;
+            html += `<button class="tab" data-list="${list.id}" onclick="switchTab('${list.id}', this)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>${list.name} (${list.count})</button>`;
         }
         tabs.innerHTML = html;
     } catch (e) {
@@ -287,39 +320,27 @@ async function loadItems() {
 
 function renderSyncedItems(data) {
     const content = document.getElementById('content');
-    const byCategory = data.by_category || {};
     const items = data.items || [];
 
-    document.getElementById('itemCount').textContent = items.length;
+    document.getElementById('itemCountValue').textContent = items.length;
 
     if (items.length === 0) {
         content.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🛒</div><h3>' + __('empty.synced_title') + '</h3><p>' + __('empty.synced_text') + '</p></div>';
         return;
     }
 
-    let html = '';
-    for (const [cat, catItems] of Object.entries(byCategory)) {
-        html += `
-            <div class="category">
-                <div class="category-header">
-                    <span>${getCategoryIcon(cat)}</span>
-                    <span>${cat}</span>
-                    <span class="category-count">${catItems.length}</span>
-                </div>
-                <div class="item-list">
-                    ${catItems.map(item => renderItem(item)).join('')}
-                </div>
-            </div>
-        `;
-    }
-    content.innerHTML = html;
+    content.innerHTML = `
+        <div class="item-list">
+            ${items.map(item => renderItem(item)).join('')}
+        </div>
+    `;
 }
 
 function renderBAPItems(data) {
     const content = document.getElementById('content');
     const items = data.items || [];
 
-    document.getElementById('itemCount').textContent = items.length;
+    document.getElementById('itemCountValue').textContent = items.length;
 
     if (items.length === 0) {
         content.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><h3>' + __('empty.bap_title') + '</h3></div>';
@@ -337,7 +358,7 @@ function renderGrocyItems(data) {
     const content = document.getElementById('content');
     const items = data.items || [];
 
-    document.getElementById('itemCount').textContent = items.length;
+    document.getElementById('itemCountValue').textContent = items.length;
 
     if (items.length === 0) {
         content.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📦</div><h3>' + __('empty.grocy_title') + '</h3></div>';
@@ -505,6 +526,7 @@ async function syncWithBAP() {
         await loadItems();
         const now = new Date().toISOString();
         localStorage.setItem('grot2buy_last_sync', now);
+        lastSyncTime = now;
         updateSyncStatus(true, formatTime(now));
     } catch (e) {
         toast( __('sync.failed') );
@@ -561,6 +583,8 @@ async function saveSyncInterval() {
         body: JSON.stringify({ interval }),
     });
     toast(res.result);
+    updatePillAuto(interval);
+    startSyncTimer(interval);
     closeModal('settingsModal');
 }
 
@@ -602,20 +626,8 @@ function closeModal(id) {
     document.getElementById(id).classList.remove('open');
 }
 
-function getCategoryIcon(cat) {
-    const icons = {
-        'Obst & Gemüse': '🥬',
-        'Milchprodukte': '🥛',
-        'Fleisch & Wurst': '🥩',
-        'Getränke': '🥤',
-        'Brot & Gebäck': '🍞',
-        'Vorrat': '🥫',
-        'Tiefkühl': '❄️',
-        'Süßigkeiten': '🍫',
-        'Drogerie': '🧴',
-        'Sonstiges': '📦',
-    };
-    return icons[cat] || '📦';
+function scrollToTop() {
+    document.getElementById('content').scrollTop = 0;
 }
 
 function escapeHtml(str) {

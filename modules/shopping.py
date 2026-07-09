@@ -1,4 +1,5 @@
 """Einkaufslisten-Modul: Grocy + Buy Me a Pie + Synchronisation."""
+import httpx
 import logging
 from typing import Optional
 from .buymeapie import BuyMeAPieClient, create_client
@@ -10,11 +11,16 @@ class GrocyClient:
     """Grocy API Client — Einkaufsliste + Bestand."""
 
     def __init__(self, base_url: str, api_key: str):
-        import httpx
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self._headers = {"GROCY-API-KEY": api_key}
         self._client = httpx.Client(timeout=10)
+
+    def close(self):
+        try:
+            self._client.close()
+        except Exception as e:
+            logger.debug(f"GrocyClient close: {e}")
 
     def _get(self, endpoint: str):
         resp = self._client.get(f"{self.base_url}/api/{endpoint}", headers=self._headers)
@@ -30,8 +36,25 @@ class GrocyClient:
         resp = self._client.delete(f"{self.base_url}/api/{endpoint}", headers=self._headers)
         return resp.status_code in (200, 204)
 
-    def get_shopping_list(self, list_id: int = 1, include_done: bool = False) -> list:
+    def _put(self, endpoint: str, data: dict):
+        resp = self._client.put(f"{self.base_url}/api/{endpoint}",
+                                headers={**self._headers, "Content-Type": "application/json"}, json=data)
+        resp.raise_for_status()
+        return resp.json() if resp.text else {}
+
+    def _get_main_list_id(self) -> int:
         try:
+            lists = self._get("objects/shopping_lists")
+            if isinstance(lists, list) and lists:
+                return int(lists[0]["id"])
+        except Exception:
+            pass
+        return 1
+
+    def get_shopping_list(self, list_id: Optional[int] = None, include_done: bool = False) -> list:
+        try:
+            if list_id is None:
+                list_id = self._get_main_list_id()
             items = self._get("objects/shopping_list")
             if not isinstance(items, list):
                 return []
@@ -57,8 +80,10 @@ class GrocyClient:
             logger.error(f"Grocy Shopping List Fehler: {e}")
             return []
 
-    def add_to_shopping_list(self, product_name: str, amount: int = 1, list_id: int = 1) -> str:
+    def add_to_shopping_list(self, product_name: str, amount: int = 1, list_id: Optional[int] = None) -> str:
         try:
+            if list_id is None:
+                list_id = self._get_main_list_id()
             products = self._get("objects/products")
             product = next((p for p in products if p.get("name", "").lower() == product_name.lower()), None)
 
@@ -108,6 +133,14 @@ class GrocyClient:
         except Exception:
             return False
 
+    def update_shopping_list_item(self, item_id: int, amount: int) -> bool:
+        try:
+            self._put(f"objects/shopping_list/{item_id}", {"amount": amount})
+            return True
+        except Exception as e:
+            logger.error(f"Grocy update item Fehler: {e}")
+            return False
+
 
 class ShoppingManager:
     """Einheitlicher Manager: Grocy, Buy Me a Pie oder Lokal."""
@@ -118,8 +151,11 @@ class ShoppingManager:
 
     def configure_grocy(self, base_url: str, api_key: str) -> bool:
         try:
-            self._grocy = GrocyClient(base_url, api_key)
-            self._grocy.get_shopping_list()
+            if self._grocy:
+                self._grocy.close()
+            client = GrocyClient(base_url, api_key)
+            client.get_shopping_list()
+            self._grocy = client
             return True
         except Exception as e:
             logger.error(f"Grocy Verbindung fehlgeschlagen: {e}")

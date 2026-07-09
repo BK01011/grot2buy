@@ -1,11 +1,11 @@
-const CACHE = 'grot2buy-v7';
+const CACHE = 'grot2buy-v11';
 
 const PRECACHE = [
-  '/?sw=v7',
-  '/static/style.css?v=7',
-  '/static/app.js?v=7',
-  '/static/logo.svg?v=7',
-  '/static/manifest.json?v=7',
+  '/?sw=v8',
+  '/static/style.css?v=11',
+  '/static/app.js?v=11',
+  '/static/logo.svg?v=11',
+  '/static/manifest.json?v=11',
 ];
 
 self.addEventListener('install', (event) => {
@@ -44,8 +44,8 @@ self.addEventListener('message', (event) => {
   if (event.data?.type === 'show-notification') {
     self.registration.showNotification(event.data.title, {
       body: event.data.body,
-      icon: '/static/logo.svg?v=5',
-      badge: '/static/logo.svg?v=5',
+      icon: '/static/logo.svg?v=11',
+      badge: '/static/logo.svg?v=11',
       vibrate: [200, 100, 200],
     });
   }

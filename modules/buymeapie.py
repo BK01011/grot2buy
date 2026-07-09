@@ -23,6 +23,7 @@ class BuyMeAPieClient:
             "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)",
         })
         self.session.auth = (username, password)
+        self.password = None
         self._logged_in = False
 
     def _get(self, url: str) -> requests.Response:

@@ -1,13 +1,30 @@
-"""Shopping Sync v5 — Zentrale Liste als Quelle der Wahrheit."""
+"""Shopping Sync v5.2 — Zentrale Liste als Quelle der Wahrheit."""
+import asyncio
 import json
 import logging
+import os
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
-from datetime import datetime, timedelta
+from .config import config, encrypt, decrypt
 
 logger = logging.getLogger("shopping")
 DATA_DIR = Path(__file__).parent.parent / "data"
 SYNC_FILE = DATA_DIR / "shopping_sync.json"
+SYNC_VERSION = 1
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _atomic_write(path: Path, content: str):
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(content, encoding="utf-8")
+    tmp.replace(path)
+
+
+SYNC_DATA_VERSION = 1
 
 
 class ShoppingSync:
@@ -15,6 +32,8 @@ class ShoppingSync:
         self._synced_items: list[dict] = []
         self._removed: list[str] = []
         self._removed_set: set[str] = set()
+        self._lock = asyncio.Lock()
+        self._sync_running = False
         self.load()
 
     def load(self):
@@ -22,17 +41,23 @@ class ShoppingSync:
             try:
                 raw = SYNC_FILE.read_text()
                 if raw.startswith("gAAAAA"):
-                    from .config import decrypt
                     raw = decrypt(raw)
                 data = json.loads(raw)
                 if isinstance(data, list):
                     self._synced_items = data
                     self._removed = []
-                else:
+                elif isinstance(data, dict):
                     self._synced_items = data.get("items", [])
                     self._removed = data.get("removed", [])
+                    ver = data.get("__version__", 0)
+                    if ver < 1:
+                        pass
+                else:
+                    self._synced_items = []
+                    self._removed = []
                 self._removed_set = {self._norm(r) for r in self._removed}
-            except Exception:
+            except Exception as e:
+                logger.error(f"Sync-Datei korrupt, starte neu: {e}")
                 self._synced_items = []
                 self._removed = []
                 self._removed_set = set()
@@ -40,12 +65,16 @@ class ShoppingSync:
     def save(self):
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         try:
-            from .config import encrypt
             self._removed_set = {self._norm(r) for r in self._removed}
-            payload = {"items": self._synced_items, "removed": self._removed}
-            SYNC_FILE.write_text(encrypt(json.dumps(payload, ensure_ascii=False)))
-        except Exception:
-            pass
+            payload = {
+                "__version__": SYNC_DATA_VERSION,
+                "items": self._synced_items,
+                "removed": self._removed,
+            }
+            content = encrypt(json.dumps(payload, ensure_ascii=False))
+            _atomic_write(SYNC_FILE, content)
+        except Exception as e:
+            logger.error(f"Sync-Datei schreiben fehlgeschlagen: {e}")
 
     def _norm(self, name: str) -> str:
         return name.lower().strip()
@@ -60,20 +89,35 @@ class ShoppingSync:
     def _is_removed(self, name: str) -> bool:
         return self._norm(name) in self._removed_set
 
+    async def acquire_lock(self):
+        await self._lock.acquire()
+        self._sync_running = True
+
+    def release_lock(self):
+        self._sync_running = False
+        self._lock.release()
+
     # ─── Sync ──────────────────────────────────────────────────
 
-    def sync_full(self, grocy_client, bap_client, is_initial: bool = False) -> str:
+    async def sync_full(self, grocy_client, bap_client, is_initial: bool = False) -> str:
+        async with self._lock:
+            self._sync_running = True
+            try:
+                return self._sync_full_inner(grocy_client, bap_client, is_initial)
+            finally:
+                self._sync_running = False
+
+    def _sync_full_inner(self, grocy_client, bap_client, is_initial: bool = False) -> str:
         log = []
         log.append("=== SYNC START ===")
 
         # ── 1. BAP lesen ─────────────────────────────────────
-        bap_active = {}     # nn → {title, list_id, item_id}
-        bap_purchased = {}  # nn → {title, list_id, item_id} (letzter)
-        bap_purchased_all = {}  # nn → [{title, list_id, item_id}, ...] (alle)
+        bap_active = {}
+        bap_purchased = {}
+        bap_purchased_all = {}
         target_list_id = None
 
         if bap_client:
-            from .config import config
             target_name = config.get("bap_list_name", "Einkaufsliste").lower()
             try:
                 for lst in bap_client.get_lists():
@@ -88,7 +132,14 @@ class ShoppingSync:
                         nn = self._norm(title)
                         if not nn:
                             continue
-                        entry = {"title": title, "list_id": lid, "item_id": item.get("id")}
+                        bap_amount = item.get("amount", "")
+                        qty = 1
+                        if bap_amount:
+                            try:
+                                qty = int(''.join(c for c in bap_amount if c.isdigit()))
+                            except ValueError:
+                                qty = 1
+                        entry = {"title": title, "list_id": lid, "item_id": item.get("id"), "quantity": max(1, qty)}
                         if item.get("is_purchased"):
                             bap_purchased[nn] = entry
                             bap_purchased_all.setdefault(nn, []).append(entry)
@@ -99,9 +150,9 @@ class ShoppingSync:
                 log.append(f"BAP Fehler: {e}")
 
         # ── 2. Grocy lesen ────────────────────────────────────
-        grocy_active = {}      # nn → {id, amount, product_name} (letzter Eintrag)
-        grocy_done = {}        # nn → {id, amount, product_name}
-        grocy_dup_ids = {}     # nn → [alle ids] (für Duplikat-Bereinigung)
+        grocy_active = {}
+        grocy_done = {}
+        grocy_dup_ids = {}
         if grocy_client:
             try:
                 for g in grocy_client.get_shopping_list(include_done=True):
@@ -128,12 +179,13 @@ class ShoppingSync:
         log.append(f"Synced: {list(synced_by_nn.keys())}")
 
         # ── 4. Neue Artikel aus BAP/Grocy in synced mergen ────
-        fresh_items = set()  # In diesem Sync neu hinzugefügte Items
+        fresh_items = set()
+        now_ts = _utcnow().isoformat()
 
         for nn, entry in bap_active.items():
             if nn not in synced_by_nn:
-                item = {"name": entry["title"], "quantity": 1, "category": "",
-                       "source": "bap", "added_at": datetime.now().isoformat()}
+                item = {"name": entry["title"], "quantity": entry.get("quantity", 1), "category": "",
+                       "source": "bap", "added_at": now_ts}
                 self._synced_items.append(item)
                 synced_by_nn[nn] = item
                 fresh_items.add(nn)
@@ -142,13 +194,12 @@ class ShoppingSync:
         for nn, entry in bap_purchased.items():
             if nn not in synced_by_nn:
                 if is_initial and nn not in grocy_active and nn not in grocy_done:
-                    item = {"name": entry["title"], "quantity": 1, "category": "",
-                           "source": "bap", "added_at": datetime.now().isoformat()}
+                    item = {"name": entry["title"], "quantity": entry.get("quantity", 1), "category": "",
+                           "source": "bap", "added_at": now_ts}
                     log.append(f"  Neu in synced (BAP purchased → aktiv weil initial): {entry['title']}")
                 else:
-                    item = {"name": entry["title"], "quantity": 1, "category": "",
-                           "source": "bap", "purchased": True,
-                           "purchased_at": datetime.now().isoformat()}
+                    item = {"name": entry["title"], "quantity": entry.get("quantity", 1), "category": "",
+                           "source": "bap", "purchased": True, "purchased_at": now_ts}
                     log.append(f"  Neu in synced (BAP purchased): {entry['title']}")
                 self._synced_items.append(item)
                 synced_by_nn[nn] = item
@@ -157,7 +208,7 @@ class ShoppingSync:
         for nn, entry in grocy_active.items():
             if nn not in synced_by_nn:
                 item = {"name": entry["product_name"], "quantity": entry.get("amount", 1), "category": "",
-                       "source": "grocy", "added_at": datetime.now().isoformat()}
+                       "source": "grocy", "added_at": now_ts}
                 self._synced_items.append(item)
                 synced_by_nn[nn] = item
                 fresh_items.add(nn)
@@ -166,8 +217,7 @@ class ShoppingSync:
         for nn, entry in grocy_done.items():
             if nn not in synced_by_nn:
                 item = {"name": entry["product_name"], "quantity": entry.get("amount", 1), "category": "",
-                       "source": "grocy", "purchased": True,
-                       "purchased_at": datetime.now().isoformat()}
+                       "source": "grocy", "purchased": True, "purchased_at": now_ts}
                 self._synced_items.append(item)
                 synced_by_nn[nn] = item
                 fresh_items.add(nn)
@@ -191,7 +241,6 @@ class ShoppingSync:
                 bap_active_flag = nn in bap_active and not bap_purchased_flag
                 bap_has = bap_purchased_flag or bap_active_flag
 
-                # Wer hat sich seit letztem Sync geändert? (synced = Baseline)
                 grocy_says_purchased = grocy_purchased
                 grocy_changed = grocy_has and (grocy_says_purchased != synced_purchased)
 
@@ -203,7 +252,6 @@ class ShoppingSync:
                            f"GR_akt={nn in grocy_active}, GR_done={nn in grocy_done}, "
                            f"GR_changed={grocy_changed}, BAP_changed={bap_changed}")
 
-                # Gewünschten Status ermitteln
                 if grocy_changed and bap_changed:
                     desired_purchased = grocy_says_purchased
                     log.append(f"  {name}: Konflikt BAP↔Grocy → Grocy gewinnt ({'gekauft' if desired_purchased else 'aktiv'})")
@@ -233,11 +281,10 @@ class ShoppingSync:
                 item["purchased"] = desired_purchased
                 item["source"] = "grocy" if grocy_changed else ("bap" if bap_changed else "sync")
                 if desired_purchased:
-                    item["purchased_at"] = datetime.now().isoformat()
+                    item["purchased_at"] = now_ts
                 else:
                     item.pop("purchased_at", None)
 
-            # Quantity aus primärer Quelle übernehmen
             if nn not in fresh_items and nn in grocy_active and not nn in grocy_done:
                 item["quantity"] = grocy_active[nn].get("amount", qty)
 
@@ -246,7 +293,6 @@ class ShoppingSync:
                    "mark_purchased_bap": [], "mark_done_grocy": [],
                    "revert_grocy": [], "del_bap": [], "del_grocy_active": []}
 
-        # 6a: Grocy-Duplikate bereinigen (mehrere aktive Einträge für gleichen Namen)
         for nn, entries in grocy_dup_ids.items():
             if len(entries) > 1:
                 for dup in entries[:-1]:
@@ -287,8 +333,7 @@ class ShoppingSync:
                     actions["add_grocy"].append({"name": name, "qty": qty})
                     log.append(f"  → Grocy +{name}")
 
-        # ── 7. Actions ausführen (alle API-Calls hier!) ───────
-        # 7a: Hinzufügen (bevor gelöscht wird — sicherheitshalber)
+        # ── 7. Actions ausführen ───────────────────────────────
         for a in actions["add_bap"]:
             try:
                 bap_client.add_item(a["list_id"], a["name"], a["qty"])
@@ -302,7 +347,6 @@ class ShoppingSync:
             except Exception as e:
                 log.append(f"  ✗ Grocy +{a['name']}: {e}")
 
-        # 7b: Purchased/Done markieren
         for a in actions["mark_purchased_bap"]:
             try:
                 bap_client.mark_purchased(a["list_id"], a["item_id"])
@@ -316,7 +360,6 @@ class ShoppingSync:
             except Exception as e:
                 log.append(f"  ✗ Grocy done: {e}")
 
-        # 7c: Grocy duplicate active löschen (statt done zu markieren)
         for a in actions["del_grocy_active"]:
             try:
                 grocy_client.remove_from_shopping_list(a["id"])
@@ -324,7 +367,6 @@ class ShoppingSync:
             except Exception as e:
                 log.append(f"  ✗ Grocy del active: {e}")
 
-        # 7d: Grocy revert (done→active)
         for a in actions["revert_grocy"]:
             try:
                 grocy_client.revert_done(a["id"])
@@ -332,7 +374,6 @@ class ShoppingSync:
             except Exception as e:
                 log.append(f"  ✗ Grocy revert: {e}")
 
-        # 7d: Alte BAP purchased-Einträge löschen (nachdem active angelegt)
         for a in actions["del_bap"]:
             try:
                 bap_client.delete_item(a["list_id"], a["item_id"])
@@ -341,7 +382,7 @@ class ShoppingSync:
                 log.append(f"  ✗ BAP del: {e}")
 
         # ── 8. Alte purchased-Einträge bereinigen (>24h) ──────
-        cutoff = datetime.now() - timedelta(hours=24)
+        cutoff = _utcnow() - timedelta(hours=24)
         before = len(self._synced_items)
         cleaned = []
         for item in self._synced_items:
@@ -351,15 +392,14 @@ class ShoppingSync:
                     try:
                         if datetime.fromisoformat(pa) < cutoff:
                             continue
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"purchased_at parse: {e}")
                 if not item.get("purchased_at"):
-                    item["purchased_at"] = datetime.now().isoformat()
+                    item["purchased_at"] = _utcnow().isoformat()
             cleaned.append(item)
         self._synced_items = cleaned
         removed_old = before - len(self._synced_items)
 
-        # Removed-Liste aufräumen
         all_active = set()
         for item in self._synced_items:
             if not item.get("purchased"):
@@ -385,33 +425,34 @@ class ShoppingSync:
 
     # ─── CRUD ──────────────────────────────────────────────────
 
-    def add_item(self, name: str, quantity: int = 1, category: str = "", source: str = "manual") -> str:
-        if self._is_removed(name):
-            nn = self._norm(name)
-            self._removed = [r for r in self._removed if self._norm(r) != nn]
-            self._removed_set.discard(nn)
-        existing = self._find(name)
-        if existing:
-            existing["quantity"] = existing.get("quantity", 1) + quantity
+    async def add_item(self, name: str, quantity: int = 1, category: str = "", source: str = "manual") -> str:
+        async with self._lock:
+            if self._is_removed(name):
+                nn = self._norm(name)
+                self._removed = [r for r in self._removed if self._norm(r) != nn]
+                self._removed_set.discard(nn)
+            existing = self._find(name)
+            if existing:
+                existing["quantity"] = existing.get("quantity", 1) + quantity
+                self.save()
+                return f"✅ '{name}' aktualisiert (jetzt x{existing['quantity']})."
+            self._synced_items.append({
+                "name": name, "quantity": quantity, "category": category,
+                "source": source, "added_at": _utcnow().isoformat(),
+            })
             self.save()
-            return f"✅ '{name}' aktualisiert (jetzt x{existing['quantity']})."
-        self._synced_items.append({
-            "name": name, "quantity": quantity, "category": category,
-            "source": source, "added_at": datetime.now().isoformat(),
-        })
-        self.save()
-        return f"✅ '{name}' hinzugefügt."
+            return f"✅ '{name}' hinzugefügt."
 
-    def remove_item(self, name: str, bap_client=None, grocy_client=None) -> str:
-        self._removed.append(name)
-        self._removed_set.add(self._norm(name))
-        before = len(self._synced_items)
-        self._synced_items = [i for i in self._synced_items if self._norm(i.get("name", "")) != self._norm(name)]
-        removed = before - len(self._synced_items)
-        self.save()
+    async def remove_item(self, name: str, bap_client=None, grocy_client=None) -> str:
+        async with self._lock:
+            self._removed.append(name)
+            self._removed_set.add(self._norm(name))
+            before = len(self._synced_items)
+            self._synced_items = [i for i in self._synced_items if self._norm(i.get("name", "")) != self._norm(name)]
+            removed = before - len(self._synced_items)
+            self.save()
         if bap_client and removed:
             try:
-                from .config import config
                 target_name = config.get("bap_list_name", "Einkaufsliste").lower()
                 for lst in bap_client.get_lists():
                     if target_name in lst.get("name", "").lower():
@@ -420,28 +461,28 @@ class ShoppingSync:
                                 bap_client.delete_item(lst["id"], item["id"])
                                 break
                         break
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"BAP remove cleanup: {e}")
         if grocy_client and removed:
             try:
                 for g in grocy_client.get_shopping_list():
                     if self._norm(g.get("product", {}).get("name", "")) == self._norm(name):
                         grocy_client.remove_from_shopping_list(g["id"])
                         break
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Grocy remove cleanup: {e}")
         return f"✅ '{name}' entfernt." if removed else f"❌ '{name}' nicht gefunden."
 
-    def mark_purchased(self, name: str, bap_client=None, grocy_client=None) -> str:
-        item = self._find(name)
-        if not item:
-            return f"❌ '{name}' nicht gefunden."
-        item["purchased"] = True
-        item["purchased_at"] = datetime.now().isoformat()
-        self.save()
+    async def mark_purchased(self, name: str, bap_client=None, grocy_client=None) -> str:
+        async with self._lock:
+            item = self._find(name)
+            if not item:
+                return f"❌ '{name}' nicht gefunden."
+            item["purchased"] = True
+            item["purchased_at"] = _utcnow().isoformat()
+            self.save()
         if bap_client:
             try:
-                from .config import config
                 target_name = config.get("bap_list_name", "Einkaufsliste").lower()
                 for lst in bap_client.get_lists():
                     if target_name in lst.get("name", "").lower():
@@ -450,32 +491,34 @@ class ShoppingSync:
                                 bap_client.mark_purchased(lst["id"], bitem["id"])
                                 break
                         break
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"BAP mark purchased: {e}")
         if grocy_client:
             try:
                 for gitem in grocy_client.get_shopping_list():
                     if not gitem.get("done") and self._norm(gitem.get("product", {}).get("name", "")) == self._norm(name):
                         grocy_client.mark_done(gitem["id"])
                         break
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Grocy mark done: {e}")
         return f"✅ '{name}' als gekauft markiert."
 
-    def update_quantity(self, name: str, quantity: int) -> str:
-        item = self._find(name)
-        if item:
-            item["quantity"] = quantity
-            self.save()
-            return f"✅ '{name}' Menge auf x{quantity} aktualisiert."
-        return f"❌ '{name}' nicht gefunden."
+    async def update_quantity(self, name: str, quantity: int) -> str:
+        async with self._lock:
+            item = self._find(name)
+            if item:
+                item["quantity"] = quantity
+                self.save()
+                return f"✅ '{name}' Menge auf x{quantity} aktualisiert."
+            return f"❌ '{name}' nicht gefunden."
 
-    def clear_purchased(self) -> str:
-        before = len(self._synced_items)
-        self._synced_items = [i for i in self._synced_items if not i.get("purchased")]
-        removed = before - len(self._synced_items)
-        self.save()
-        return f"✅ {removed} gekaufte Artikel entfernt."
+    async def clear_purchased(self) -> str:
+        async with self._lock:
+            before = len(self._synced_items)
+            self._synced_items = [i for i in self._synced_items if not i.get("purchased")]
+            removed = before - len(self._synced_items)
+            self.save()
+            return f"✅ {removed} gekaufte Artikel entfernt."
 
     def get_merged_text(self) -> str:
         active = [i for i in self._synced_items if not i.get("purchased") and not self._is_removed(i.get("name", ""))]
@@ -494,7 +537,6 @@ class ShoppingSync:
     # ─── API: BAP Sync ─────────────────────────────────────────
 
     def push_to_buymeapie(self, bap_client) -> str:
-        from .config import config
         target_name = config.get("bap_list_name", "Einkaufsliste").lower()
         target_list_id = None
         for lst in bap_client.get_lists():
@@ -515,12 +557,12 @@ class ShoppingSync:
             try:
                 bap_client.add_item(target_list_id, item["name"], item.get("quantity", 1))
                 added += 1
-            except Exception:
+            except Exception as e:
+                logger.debug(f"BAP push item: {e}")
                 continue
         return f"📤 {added} Artikel zu BAP gepusht."
 
     def pull_purchased_from_bap(self, bap_client, grocy_client=None) -> str:
-        from .config import config
         target_name = config.get("bap_list_name", "Einkaufsliste").lower()
         marked = 0
         for lst in bap_client.get_lists():
@@ -532,7 +574,7 @@ class ShoppingSync:
                     existing = self._find(title)
                     if existing and not existing.get("purchased"):
                         existing["purchased"] = True
-                        existing["purchased_at"] = datetime.now().isoformat()
+                        existing["purchased_at"] = _utcnow().isoformat()
                         marked += 1
                     if grocy_client:
                         try:
@@ -541,8 +583,8 @@ class ShoppingSync:
                                 if self._norm(g.get("product", {}).get("name", "")) == nn and not g.get("done"):
                                     grocy_client.mark_done(g["id"])
                                     break
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.debug(f"Grocy pull purchased: {e}")
                 break
         self.save()
         return f"📥 {marked} Artikel als gekauft markiert."
@@ -556,7 +598,8 @@ class ShoppingSync:
                 result = grocy_client.add_to_shopping_list(item["name"], item.get("quantity", 1))
                 if "hinzugefügt" in result:
                     added += 1
-            except Exception:
+            except Exception as e:
+                logger.debug(f"Grocy push item: {e}")
                 continue
         return f"📤 {added} Artikel zu Grocy gepusht."
 
