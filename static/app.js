@@ -81,6 +81,55 @@ async function sendNotification(title, body) {
     }
 }
 
+// ─── WebSocket ───────────────────────────────────────────────
+
+let ws = null;
+let wsReconnectAttempts = 0;
+const WS_MAX_RECONNECT = 20;
+
+function connectWebSocket() {
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(`${protocol}//${location.host}/ws`);
+
+    ws.onopen = () => {
+        wsReconnectAttempts = 0;
+    };
+
+    ws.onmessage = (event) => {
+        try {
+            const msg = JSON.parse(event.data);
+            switch (msg.type) {
+                case 'sync_complete':
+                    lastSyncTime = msg.timestamp;
+                    localStorage.setItem('grot2buy_last_sync', msg.timestamp);
+                    updateSyncStatus(true, formatTime(msg.timestamp));
+                    loadItems();
+                    loadLists();
+                    break;
+                case 'items_updated':
+                    loadItems();
+                    loadLists();
+                    break;
+            }
+        } catch (e) {
+            console.error('WS message error:', e);
+        }
+    };
+
+    ws.onclose = () => {
+        ws = null;
+        if (wsReconnectAttempts < WS_MAX_RECONNECT) {
+            wsReconnectAttempts++;
+            setTimeout(connectWebSocket, Math.min(1000 * wsReconnectAttempts, 10000));
+        }
+    };
+
+    ws.onerror = () => {
+        ws?.close();
+    };
+}
+
 // ─── Init ────────────────────────────────────────────────────
 
 // Service Worker sofort aktualisieren, falls neue Version wartet
@@ -155,6 +204,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     applyTheme(localStorage.getItem('grot2buy_theme') || 'auto');
     updateDarkModeBtn();
     requestNotificationPermission();
+    connectWebSocket();
 
     const lastSync = localStorage.getItem('grot2buy_last_sync');
     if (lastSync) {

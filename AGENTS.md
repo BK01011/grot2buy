@@ -67,4 +67,8 @@ Sprache wird in `config["lang"]` gespeichert. Neue Sprache hinzufügen:
 Docker-Optimierung (367 MB → 203 MB, −45%), 
 Regressionstest (16 Endpunkte), Token-Expiry (30 Tage)
 
+`0.7.0` — WebSocket Live-Sync (Push statt Polling),
+ConnectionManager, `/ws` Endpunkt, Broadcast bei Sync + CRUD,
+Cross-Tab Sync, Auto-Reconnect
+
 Autor: S.B. | Lizenz: MIT | Erstellt mit KI-Unterstützung (opencode, Claude)

@@ -4,6 +4,36 @@ All changes to Grot2Buy with explanations.
 
 ---
 
+## [0.7.0] — 2026-07-09
+
+### 🔌 WebSocket Live-Sync (Push statt Polling)
+
+**Problem**: UI aktualisierte sich nur nach manuellem Sync oder HTTP-Polling. Mehrere Browser-Tabs waren nicht synchron.
+
+**Lösung**: Echtzeit-Updates via WebSocket an alle verbundenen Clients.
+
+**Backend**:
+- `ConnectionManager` — verwaltet alle WebSocket-Verbindungen mit `asyncio.Lock`
+- `/ws` WebSocket-Endpunkt — authentifiziert via Cookie (auth_token)
+- `broadcast_sync_complete()` — nach jedem Sync: alle Tabs aktualisieren Sync-Pill + Items
+- `broadcast_items_updated()` — nach CRUD (add/remove/purchased/quantity/clear)
+- WebSocket-Protokoll: `sync_complete`, `items_updated`, `ping`/`pong`
+- Background-Sync sendet jetzt `sync_complete` an alle Clients
+- Sync- + CRUD-Endpunkte senden Broadcasts
+
+**Frontend**:
+- `connectWebSocket()` — verbindet bei `DOMContentLoaded`, Protokoll ws:// oder wss://
+- Automatische Reconnect: bis zu 20 Versuche, Backoff 1–10s
+- `sync_complete`: aktualisiert Sync-Pill, `localStorage`, Items + Tabs
+- `items_updated`: aktualisiert Items + Tabs (Cross-Tab-Sync)
+- Fallback: Sync-Button und Timer funktionieren weiterhin via HTTP
+
+**Cache bust**: `?v=11` → `?v=12`, SW-Cache `grot2buy-v11` → `grot2buy-v12`
+
+**Version**: `0.6.0` → `0.7.0`
+
+---
+
 ## [0.5.0] — 2026-07-09
 
 ### 📱 Sync-Status-Pill + Pull-to-Refresh + Header-Redesign
@@ -370,6 +400,36 @@ value = Fernet(key).decrypt(token.encode()).decode()
 # Changelog — Grot2Buy
 
 Alle Änderungen an Grot2Buy mit Begründungen.
+
+---
+
+## [0.7.0] — 2026-07-09
+
+### 🔌 WebSocket Live-Sync (Push statt Polling)
+
+**Problem**: UI aktualisierte sich nur nach manuellem Sync oder HTTP-Polling. Mehrere Browser-Tabs waren nicht synchron.
+
+**Lösung**: Echtzeit-Updates via WebSocket an alle verbundenen Clients.
+
+**Backend**:
+- `ConnectionManager` — verwaltet alle WebSocket-Verbindungen mit `asyncio.Lock`
+- `/ws` WebSocket-Endpunkt — authentifiziert via Cookie (auth_token)
+- `broadcast_sync_complete()` — nach jedem Sync: alle Tabs aktualisieren Sync-Pill + Items
+- `broadcast_items_updated()` — nach CRUD (add/remove/purchased/quantity/clear)
+- WebSocket-Protokoll: `sync_complete`, `items_updated`, `ping`/`pong`
+- Background-Sync sendet jetzt `sync_complete` an alle Clients
+- Sync- + CRUD-Endpunkte senden Broadcasts
+
+**Frontend**:
+- `connectWebSocket()` — verbindet bei `DOMContentLoaded`, Protokoll ws:// oder wss://
+- Automatische Reconnect: bis zu 20 Versuche, Backoff 1–10s
+- `sync_complete`: aktualisiert Sync-Pill, `localStorage`, Items + Tabs
+- `items_updated`: aktualisiert Items + Tabs (Cross-Tab-Sync)
+- Fallback: Sync-Button und Timer funktionieren weiterhin via HTTP
+
+**Cache bust**: `?v=11` → `?v=12`, SW-Cache `grot2buy-v11` → `grot2buy-v12`
+
+**Version**: `0.6.0` → `0.7.0`
 
 ---
 

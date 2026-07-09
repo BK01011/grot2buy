@@ -16,7 +16,9 @@ from typing import Optional
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
-VERSION = "0.6.0"
+from fastapi import WebSocket, WebSocketDisconnect
+
+VERSION = "0.7.0"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -111,6 +113,50 @@ def _set_auth_cookie(response, token: str):
     )
 
 
+# ─── WebSocket Connection Manager ──────────────────────────────
+
+class ConnectionManager:
+    def __init__(self):
+        self._connections: list[WebSocket] = []
+        self._lock = asyncio.Lock()
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        async with self._lock:
+            self._connections.append(websocket)
+
+    async def disconnect(self, websocket: WebSocket):
+        async with self._lock:
+            if websocket in self._connections:
+                self._connections.remove(websocket)
+
+    async def broadcast(self, message: dict):
+        dead = []
+        async with self._lock:
+            for ws in self._connections:
+                try:
+                    await ws.send_json(message)
+                except Exception:
+                    dead.append(ws)
+            for ws in dead:
+                self._connections.remove(ws)
+
+
+ws_manager = ConnectionManager()
+
+
+async def broadcast_sync_complete(result: str):
+    await ws_manager.broadcast({
+        "type": "sync_complete",
+        "result": result,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+
+
+async def broadcast_items_updated():
+    await ws_manager.broadcast({"type": "items_updated"})
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Grot2Buy startet...")
@@ -152,6 +198,7 @@ async def _background_sync():
                 if grocy or bap_client:
                     result = await shopping_sync.sync_full(grocy, bap_client)
                     logger.info(f"Auto-Sync: {result}")
+                    await broadcast_sync_complete(result)
             else:
                 await asyncio.sleep(60)
         except asyncio.CancelledError:
@@ -362,6 +409,7 @@ async def api_add_item(request: Request, _: bool = Depends(verify_token)):
 
     result = await shopping_sync.add_item(name, quantity, category)
     logger.info(f"Hinzugefügt: {name} (x{quantity}, {category})")
+    await broadcast_items_updated()
 
     return JSONResponse({
         "result": result,
@@ -403,6 +451,7 @@ async def api_add_items_bulk(request: Request, _: bool = Depends(verify_token)):
         else:
             skipped += 1
 
+    await broadcast_items_updated()
     return JSONResponse({
         "added": added,
         "skipped": skipped,
@@ -416,6 +465,7 @@ async def api_remove_item(item_name: str, _: bool = Depends(verify_token)):
     grocy_client = shopping_manager._grocy if shopping_manager._grocy else None
     result = await shopping_sync.remove_item(item_name, bap_client=bap_client, grocy_client=grocy_client)
     logger.info(f"Entfernt: {item_name}")
+    await broadcast_items_updated()
     return JSONResponse({"result": result})
 
 
@@ -426,6 +476,7 @@ async def api_mark_purchased(item_name: str, _: bool = Depends(verify_token)):
     logger.info(f"Kauf-Anfrage für '{item_name}'")
     result = await shopping_sync.mark_purchased(item_name, bap_client=bap_client, grocy_client=grocy_client)
     logger.info(f"Erledigt: {item_name} → {result}")
+    await broadcast_items_updated()
     return JSONResponse({"result": result})
 
 
@@ -452,6 +503,7 @@ async def api_update_quantity(item_name: str, request: Request, _: bool = Depend
     lang = config.get("lang", "de")
     msg = i18n_t("item.updated", lang, name=item_name, qty=str(quantity))
     logger.info(f"Menge aktualisiert: {item_name} → x{quantity}")
+    await broadcast_items_updated()
     return JSONResponse({"result": msg})
 
 
@@ -459,6 +511,7 @@ async def api_update_quantity(item_name: str, request: Request, _: bool = Depend
 async def api_clear_purchased(_: bool = Depends(verify_token)):
     result = await shopping_sync.clear_purchased()
     logger.info(f"Gekaufte Artikel bereinigt: {result}")
+    await broadcast_items_updated()
     return JSONResponse({"result": result})
 
 
@@ -509,6 +562,7 @@ async def api_sync_full(_: bool = Depends(verify_token)):
             result = "Keine Verbindung konfiguriert"
 
         logger.info(f"Vollsync: {result}")
+        await broadcast_sync_complete(result)
         return JSONResponse({"result": result})
     except Exception as e:
         logger.error(f"Vollsync-Fehler: {e}")
@@ -734,6 +788,41 @@ async def api_system_status(_: bool = Depends(verify_token)):
         "backend": shopping_manager.backend,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     })
+
+
+# ─── WebSocket ─────────────────────────────────────────────────
+
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    has_password = bool(config.get_decrypted("password", ""))
+    if has_password:
+        token = websocket.cookies.get("auth_token", "")
+        if not token or not config.validate_token(token):
+            await websocket.close(code=1008)
+            return
+    await ws_manager.connect(websocket)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            msg = json.loads(data)
+            if msg.get("type") == "ping":
+                await websocket.send_json({"type": "pong"})
+            elif msg.get("type") == "sync_request":
+                try:
+                    result = await shopping_sync.sync_full(
+                        shopping_manager._grocy, shopping_manager._bap
+                    )
+                    logger.info(f"WS-Sync: {result}")
+                    await broadcast_sync_complete(result)
+                except Exception as e:
+                    logger.error(f"WS-Sync-Fehler: {e}")
+                    await websocket.send_json({"type": "error", "message": str(e)})
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket)
+    except Exception as e:
+        logger.debug(f"WS-Fehler: {e}")
+        ws_manager.disconnect(websocket)
 
 
 # ─── API: Downloads ─────────────────────────────────────────────
