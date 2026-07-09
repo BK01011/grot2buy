@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   shopping-list:
     build: .
@@ -15,6 +13,6 @@ services:
     healthcheck:
       test: ["CMD", "curl", "-f", "https://localhost:8899/health", "--insecure"]
       interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
+      timeout: 15s
+      retries: 5
+      start_period: 15s

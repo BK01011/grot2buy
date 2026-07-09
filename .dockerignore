@@ -10,3 +10,12 @@ venv/
 *.log
 .vscode/
 .idea/
+.opencode/
+AGENTS.md
+LICENSE
+Dockerfile
+docker-compose.yml
+.env
+.env.*
+.dockerignore
+README.md
