@@ -1,4 +1,4 @@
-# Grot2Buy v0.8.0
+# Grot2Buy v0.9.0
 
 Bidirektionale Synchronisation zwischen Buy Me a Pie, Grocy und lokaler Einkaufsliste.
 Architektur: Zentrale Liste (synced_items) als Wahrheitsquelle, **wer geändert hat gewinnt** (statt "Grocy immer").
@@ -73,5 +73,8 @@ Cross-Tab Sync, Auto-Reconnect
 
 `0.8.0` — Grocy-Bestand in UI (api/stock, get_stock(),
 Meta-Zeile mit Bestandszahl, i18n)
+
+`0.9.0` — Undo/Trash — gelöschte Items wiederherstellbar,
+Papierkorb, Undo-Toast, API-Endpunkte, Sync v2
 
 Autor: S.B. | Lizenz: MIT | Erstellt mit KI-Unterstützung (opencode, Claude)

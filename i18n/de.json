@@ -75,7 +75,19 @@
     "updated": "Menge für '{name}' auf x{qty} aktualisiert.",
     "clear_confirm": "Alle erledigten Artikel löschen?",
     "clear_done": "Alle gekauften Artikel entfernt.",
-    "stock": "Bestand: {n}"
+    "stock": "Bestand: {n}",
+    "undo": "Rückgängig",
+    "restored": "Artikel wiederhergestellt."
+  },
+  "trash": {
+    "title": "Papierkorb",
+    "empty": "Papierkorb leeren",
+    "loading": "Lade Papierkorb…",
+    "empty_hint": "Der Papierkorb ist leer.",
+    "restore": "Wiederherstellen",
+    "restored": "wiederhergestellt",
+    "emptied": "Papierkorb geleert.",
+    "confirm_empty": "Alle Artikel im Papierkorb endgültig löschen?"
   },
   "sync": {
     "start": "Synchronisiere...",

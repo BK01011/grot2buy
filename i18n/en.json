@@ -75,7 +75,19 @@
     "updated": "Quantity for '{name}' updated to x{qty}.",
     "clear_confirm": "Delete all purchased items?",
     "clear_done": "All purchased items removed.",
-    "stock": "Stock: {n}"
+    "stock": "Stock: {n}",
+    "undo": "Undo",
+    "restored": "Item restored."
+  },
+  "trash": {
+    "title": "Trash",
+    "empty": "Empty Trash",
+    "loading": "Loading trash…",
+    "empty_hint": "The trash is empty.",
+    "restore": "Restore",
+    "restored": "restored",
+    "emptied": "Trash emptied.",
+    "confirm_empty": "Permanently delete all items in trash?"
   },
   "sync": {
     "start": "Syncing...",

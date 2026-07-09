@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-VERSION = "0.8.0"
+VERSION = "0.9.0"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -465,6 +465,30 @@ async def api_remove_item(item_name: str, _: bool = Depends(verify_token)):
     grocy_client = shopping_manager._grocy if shopping_manager._grocy else None
     result = await shopping_sync.remove_item(item_name, bap_client=bap_client, grocy_client=grocy_client)
     logger.info(f"Entfernt: {item_name}")
+    await broadcast_items_updated()
+    return JSONResponse({"result": result})
+
+
+@app.get("/api/trash/items")
+async def api_trash_items(_: bool = Depends(verify_token)):
+    items = shopping_sync.get_trash()
+    return JSONResponse({"items": items, "count": len(items)})
+
+
+@app.post("/api/trash/restore/{item_name}")
+async def api_trash_restore(item_name: str, _: bool = Depends(verify_token)):
+    result = await shopping_sync.restore_item(item_name)
+    logger.info(f"Wiederhergestellt: {item_name}")
+    await broadcast_items_updated()
+    return JSONResponse({"result": result})
+
+
+@app.post("/api/trash/empty")
+async def api_trash_empty(_: bool = Depends(verify_token)):
+    bap_client = shopping_manager._bap
+    grocy_client = shopping_manager._grocy if shopping_manager._grocy else None
+    result = await shopping_sync.empty_trash(bap_client=bap_client, grocy_client=grocy_client)
+    logger.info(f"Papierkorb geleert: {result}")
     await broadcast_items_updated()
     return JSONResponse({"result": result})
 

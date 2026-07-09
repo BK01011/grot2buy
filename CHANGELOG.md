@@ -4,6 +4,24 @@ All changes to Grot2Buy with explanations.
 
 ---
 
+## [0.9.0] — 2026-07-09
+
+### 🗑️ Undo/Trash — deleted items are recoverable
+
+DE version below; English summary: soft-delete with trash + undo toast.
+
+- Sync data format v2 with `trash` field
+- `remove_item` moves to trash instead of hard-delete
+- `get_trash()`, `restore_item()`, `empty_trash()` methods
+- API endpoints: `GET /api/trash/items`, `POST /api/trash/restore/{name}`, `POST /api/trash/empty`
+- `undoToast()` with 5s undo button after delete
+- Trash button in header + trash view modal
+- Auto-migration from sync v1 → v2
+
+**Version**: `0.8.0` → `0.9.0`
+
+---
+
 ## [0.8.0] — 2026-07-09
 
 ### 📦 Grocy-Bestand in der UI anzeigen
@@ -423,6 +441,37 @@ value = Fernet(key).decrypt(token.encode()).decode()
 # Changelog — Grot2Buy
 
 Alle Änderungen an Grot2Buy mit Begründungen.
+
+---
+
+## [0.9.0] — 2026-07-09
+
+### 🗑️ Undo/Trash — gelöschte Items wiederherstellbar
+
+**Problem**: Gelöschte Items waren sofort und unwiderruflich weg. Kein Schutz vor Fehlklicks.
+
+**Lösung**: Soft-Delete mit Papierkorb + Undo-Toast.
+
+**Backend**:
+- Sync-Datenformat auf v2: neues Feld `trash` in der Sync-Datei
+- `remove_item` verschiebt Items in den Papierkorb (statt hartem Löschen)
+- `get_trash()` — gibt Papierkorb-Inhalt zurück
+- `restore_item(name)` — stellt ein Item wieder her (zurück in `_synced_items`)
+- `empty_trash()` — löscht endgültig + clean-up in BAP/Grocy
+- Drei neue API-Endpunkte: `GET /api/trash/items`, `POST /api/trash/restore/{name}`, `POST /api/trash/empty`
+- Alte Sync-Dateien (v1) werden automatisch migriert
+
+**Frontend**:
+- `undoToast()` — Toast mit "Rückgängig"-Button (5s)
+- Nach Löschen erscheint "Artikel in den Papierkorb verschoben · Rückgängig"
+- Trash-Button in der Header-Leiste öffnet Papierkorb-Ansicht
+- Trash-Ansicht: Liste der gelöschten Items mit "Wiederherstellen"-Button
+- "Papierkorb leeren" mit Bestätigung → endgültige Löschung
+- `toast()` bleibt für normale Benachrichtigungen erhalten
+
+**i18n**: `item.undo`, `item.restored` und gesamter `trash.*` Block in de.json/en.json
+
+**Version**: `0.8.0` → `0.9.0`
 
 ---
 

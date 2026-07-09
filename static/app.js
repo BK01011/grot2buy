@@ -287,6 +287,24 @@ function toast(msg, duration = 3000) {
     setTimeout(() => el.classList.remove('show'), duration);
 }
 
+function undoToast(msg, undoAction, duration = 5000) {
+    const container = document.getElementById('toastContainer');
+    const el = document.createElement('div');
+    el.className = 'undo-toast';
+    el.innerHTML = `<span class="undo-toast-msg">${escapeHtml(msg)}</span><button class="undo-toast-btn">${__('item.undo')}</button>`;
+    container.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('show'));
+    let done = false;
+    const cleanup = () => { if (!done) { done = true; el.classList.remove('show'); setTimeout(() => el.remove(), 300); } };
+    el.querySelector('.undo-toast-btn').onclick = async () => {
+        cleanup();
+        await undoAction();
+        toast(__('item.restored'));
+        loadItems();
+    };
+    setTimeout(cleanup, duration);
+}
+
 async function downloadFile(url, filename) {
     try {
         const res = await fetch(url);
@@ -484,8 +502,8 @@ async function togglePurchased(name) {
 async function removeItem(name) {
     if (!confirm( __('item.remove_confirm', {name: name}) )) return;
     const res = await api(`/items/${encodeURIComponent(name)}/remove`, { method: 'POST' });
-    toast(res.result);
     loadItems();
+    undoToast(res.result, () => api(`/trash/restore/${encodeURIComponent(name)}`, { method: 'POST' }));
 }
 
 async function changeItemQty(name, delta) {
@@ -652,6 +670,54 @@ async function clearPurchased() {
     const res = await api('/items/clear-purchased', { method: 'POST' });
     toast(res.result);
     loadItems();
+}
+
+// ─── Trash ─────────────────────────────────────────────────────
+
+async function showTrash() {
+    const modal = document.getElementById('trashModal');
+    modal.classList.add('open');
+    document.getElementById('trashList').innerHTML = `<p style="text-align:center;color:#999;">${__('trash.loading')}</p>`;
+    try {
+        const data = await api('/trash/items');
+        const list = document.getElementById('trashList');
+        if (!data.items || data.items.length === 0) {
+            list.innerHTML = `<p style="text-align:center;color:#999;">${__('trash.empty_hint')}</p>`;
+            return;
+        }
+        list.innerHTML = data.items.map(item => `
+            <div class="item trashed-item" data-name="${escapeHtml(item.name)}">
+                <div class="item-info">
+                    <div class="item-name">${escapeHtml(item.name)}</div>
+                    <div class="item-meta">${escapeHtml(item.category)}</div>
+                </div>
+                <button class="btn-secondary" onclick="restoreFromTrash('${escapeHtml(item.name)}', this)">${__('trash.restore')}</button>
+            </div>
+        `).join('');
+    } catch (e) {
+        document.getElementById('trashList').innerHTML = `<p style="text-align:center;color:var(--color-danger);">${e.message}</p>`;
+    }
+}
+
+function hideTrash() {
+    document.getElementById('trashModal').classList.remove('open');
+}
+
+async function restoreFromTrash(name, btn) {
+    btn.disabled = true;
+    btn.textContent = '…';
+    const res = await api(`/trash/restore/${encodeURIComponent(name)}`, { method: 'POST' });
+    toast(res.result || __('trash.restored'));
+    loadItems();
+    showTrash();
+}
+
+async function emptyTrash() {
+    if (!confirm(__('trash.confirm_empty'))) return;
+    const res = await api('/trash/empty', { method: 'POST' });
+    toast(res.result || __('trash.emptied'));
+    loadItems();
+    hideTrash();
 }
 
 // ─── Language ────────────────────────────────────────────────

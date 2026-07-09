@@ -24,7 +24,7 @@ def _atomic_write(path: Path, content: str):
     tmp.replace(path)
 
 
-SYNC_DATA_VERSION = 1
+SYNC_DATA_VERSION = 2
 
 
 class ShoppingSync:
@@ -32,6 +32,7 @@ class ShoppingSync:
         self._synced_items: list[dict] = []
         self._removed: list[str] = []
         self._removed_set: set[str] = set()
+        self._trash: list[dict] = []
         self._lock = asyncio.Lock()
         self._sync_running = False
         self.load()
@@ -46,21 +47,25 @@ class ShoppingSync:
                 if isinstance(data, list):
                     self._synced_items = data
                     self._removed = []
+                    self._trash = []
                 elif isinstance(data, dict):
                     self._synced_items = data.get("items", [])
                     self._removed = data.get("removed", [])
+                    self._trash = data.get("trash", [])
                     ver = data.get("__version__", 0)
-                    if ver < 1:
-                        pass
+                    if ver < 2:
+                        self._trash = []
                 else:
                     self._synced_items = []
                     self._removed = []
+                    self._trash = []
                 self._removed_set = {self._norm(r) for r in self._removed}
             except Exception as e:
                 logger.error(f"Sync-Datei korrupt, starte neu: {e}")
                 self._synced_items = []
                 self._removed = []
                 self._removed_set = set()
+                self._trash = []
 
     def save(self):
         DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -70,6 +75,7 @@ class ShoppingSync:
                 "__version__": SYNC_DATA_VERSION,
                 "items": self._synced_items,
                 "removed": self._removed,
+                "trash": self._trash,
             }
             content = encrypt(json.dumps(payload, ensure_ascii=False))
             _atomic_write(SYNC_FILE, content)
@@ -447,31 +453,67 @@ class ShoppingSync:
         async with self._lock:
             self._removed.append(name)
             self._removed_set.add(self._norm(name))
-            before = len(self._synced_items)
+            item = None
+            for i in self._synced_items:
+                if self._norm(i.get("name", "")) == self._norm(name):
+                    item = i
+                    break
+            if not item:
+                return f"❌ '{name}' nicht gefunden."
             self._synced_items = [i for i in self._synced_items if self._norm(i.get("name", "")) != self._norm(name)]
-            removed = before - len(self._synced_items)
+            # In den Papierkorb verschieben
+            trash_item = {
+                "name": item.get("name", name),
+                "quantity": item.get("quantity", 1),
+                "category": item.get("category", ""),
+                "trashed_at": _utcnow().isoformat(),
+            }
+            self._trash.append(trash_item)
             self.save()
-        if bap_client and removed:
+        return f"✅ '{name}' in den Papierkorb verschoben."
+
+    def get_trash(self) -> list[dict]:
+        return list(self._trash)
+
+    async def restore_item(self, name: str) -> str:
+        async with self._lock:
+            for i, t in enumerate(self._trash):
+                if self._norm(t.get("name", "")) == self._norm(name):
+                    item = self._trash.pop(i)
+                    item.pop("trashed_at", None)
+                    self._synced_items.append(item)
+                    self._removed = [r for r in self._removed if self._norm(r) != self._norm(name)]
+                    self._removed_set = {self._norm(r) for r in self._removed}
+                    self.save()
+                    return f"✅ '{name}' wiederhergestellt."
+            return f"❌ '{name}' nicht im Papierkorb gefunden."
+
+    async def empty_trash(self, bap_client=None, grocy_client=None) -> str:
+        async with self._lock:
+            count = len(self._trash)
+            names = [t.get("name", "") for t in self._trash]
+            self._trash = []
+            self.save()
+        # BAP/Grocy cleanup (outside lock, may be slow)
+        if bap_client:
+            target_name = config.get("bap_list_name", "Einkaufsliste").lower()
             try:
-                target_name = config.get("bap_list_name", "Einkaufsliste").lower()
                 for lst in bap_client.get_lists():
                     if target_name in lst.get("name", "").lower():
-                        for item in bap_client.get_list_items(lst["id"]):
-                            if self._norm(item.get("title", "")) == self._norm(name) and not item.get("deleted"):
-                                bap_client.delete_item(lst["id"], item["id"])
-                                break
+                        for bitem in bap_client.get_list_items(lst["id"]):
+                            if any(self._norm(n) == self._norm(bitem.get("title", "")) for n in names) and not bitem.get("deleted"):
+                                bap_client.delete_item(lst["id"], bitem["id"])
                         break
             except Exception as e:
-                logger.debug(f"BAP remove cleanup: {e}")
-        if grocy_client and removed:
+                logger.debug(f"BAP trash cleanup: {e}")
+        if grocy_client:
             try:
                 for g in grocy_client.get_shopping_list():
-                    if self._norm(g.get("product", {}).get("name", "")) == self._norm(name):
+                    if any(self._norm(n) == self._norm(g.get("product", {}).get("name", "")) for n in names):
                         grocy_client.remove_from_shopping_list(g["id"])
-                        break
             except Exception as e:
-                logger.debug(f"Grocy remove cleanup: {e}")
-        return f"✅ '{name}' entfernt." if removed else f"❌ '{name}' nicht gefunden."
+                logger.debug(f"Grocy trash cleanup: {e}")
+        return f"✅ {count} Artikel endgültig gelöscht."
 
     async def mark_purchased(self, name: str, bap_client=None, grocy_client=None) -> str:
         async with self._lock:
