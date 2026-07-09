@@ -4,6 +4,22 @@ All changes to Grot2Buy with explanations.
 
 ---
 
+## [0.11.0] — 2026-07-09
+
+### 📴 Offline-Modus
+
+English summary: offline cache for API reads, write queue replay, offline indicator.
+
+- SW caches `/api/*` GET responses (cache-then-fetch)
+- `api()` queues POST/PUT/DELETE when offline, replays on reconnect
+- Offline-badge in top bar: 📴 (offline) or ⏳ N (pending queue)
+- `showOfflineFallback()` loads cached data from SW when fetch fails offline
+- `online`/`offline` event listeners for automatic recovery
+
+**Version**: `0.10.0` → `0.11.0`
+
+---
+
 ## [0.10.0] — 2026-07-09
 
 ### 📂 Kategoriesortierung im UI (grouped by category)
@@ -37,6 +53,30 @@ DE version below; English summary: soft-delete with trash + undo toast.
 - Auto-migration from sync v1 → v2
 
 **Version**: `0.8.0` → `0.9.0`
+
+## [0.11.0] — 2026-07-09
+
+### 📴 Offline-Modus
+
+**Problem**: Bei fehlender Internetverbindung zeigte die App nur einen Fehler an. Änderungen gingen verloren.
+
+**Lösung**: Service Worker cacht API-Daten; CRUD-Operationen werden in eine Warteschlange gelegt und bei Wiederherstellung der Verbindung automatisch abgespielt.
+
+**Frontend**:
+-  fängt Netzwerkfehler ab → GET schlägt auf Cache zurück, POST/PUT/DELETE werden in  Queue gelegt
+- Offline-Badge in der oberen Leiste: 📴 (offline) oder ⏳ N (ausstehende Operationen)
+-  lädt gecachte Daten aus dem SW-Cache bei fehlgeschlagenem API-Call
+- / Event-Listener → Badge aktualisieren + Queue verarbeiten
+-  spielt die Warteschlange nacheinander ab
+
+**Service Worker**:
+-  GET-Responses werden jetzt auch gecached (bisher nur CSS/JS/SVG/JSON)
+
+**i18n**: Neue Keys  und  in de.json/en.json
+
+**Version**:  → 
+
+---
 
 ---
 

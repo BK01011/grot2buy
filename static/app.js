@@ -272,12 +272,75 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // ─── API Helpers ─────────────────────────────────────────────
 
+// ─── Offline Support ────────────────────────────────────────
+
+function getOfflineQueue() {
+    try { return JSON.parse(localStorage.getItem('grot2buy_offline_queue') || '[]'); }
+    catch { return []; }
+}
+
+function addToOfflineQueue(path, opts) {
+    const queue = getOfflineQueue();
+    queue.push({ path, method: opts?.method || 'GET', body: opts?.body ? JSON.parse(opts.body) : null, timestamp: Date.now() });
+    localStorage.setItem('grot2buy_offline_queue', JSON.stringify(queue));
+    updateOfflineBadge();
+}
+
+async function processOfflineQueue() {
+    const queue = getOfflineQueue();
+    if (queue.length === 0) return;
+    localStorage.removeItem('grot2buy_offline_queue');
+    updateOfflineBadge();
+    for (const op of queue) {
+        try {
+            await fetch(`${API}${op.path}`, {
+                method: op.method,
+                headers: { 'Content-Type': 'application/json' },
+                body: op.body ? JSON.stringify(op.body) : undefined,
+            });
+        } catch {
+            addToOfflineQueue(op.path, { method: op.method, body: op.body ? JSON.stringify(op.body) : undefined });
+            break;
+        }
+    }
+    loadItems();
+}
+
+function updateOfflineBadge() {
+    const badge = document.getElementById('offlineBadge');
+    const queue = getOfflineQueue();
+    const count = queue.length;
+    if (!navigator.onLine) {
+        badge.textContent = count > 0 ? `📴 ${count}` : '📴';
+        badge.classList.add('show');
+    } else if (count > 0) {
+        badge.textContent = `⏳ ${count}`;
+        badge.classList.add('show');
+    } else {
+        badge.classList.remove('show');
+    }
+}
+
+window.addEventListener('online', () => { updateOfflineBadge(); processOfflineQueue(); });
+window.addEventListener('offline', updateOfflineBadge);
+
+// ─── API ────────────────────────────────────────────────────
+
 async function api(path, opts = {}) {
-    const res = await fetch(`${API}${path}`, {
-        headers: { 'Content-Type': 'application/json' },
-        ...opts,
-    });
-    return res.json();
+    try {
+        const res = await fetch(`${API}${path}`, {
+            headers: { 'Content-Type': 'application/json' },
+            ...opts,
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
+    } catch (e) {
+        if (opts.method && opts.method !== 'GET') {
+            addToOfflineQueue(path, opts);
+            return { result: __('offline.queued'), offline: true };
+        }
+        throw e;
+    }
 }
 
 function toast(msg, duration = 3000) {
@@ -382,8 +445,24 @@ async function loadItems() {
             renderBAPItems(data);
         }
     } catch (e) {
-        content.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><h3>' + __('error.load_title') + '</h3><p>' + __('error.load_text') + '</p></div>';
+        showOfflineFallback();
     }
+}
+
+async function showOfflineFallback() {
+    const content = document.getElementById('content');
+    try {
+        const cache = await caches.open('grot2buy-v15');
+        const req = new Request('/api/synced/items');
+        const cached = await cache.match(req);
+        if (cached) {
+            const data = await cached.json();
+            renderSyncedItems(data);
+            toast(__('offline.cached'));
+            return;
+        }
+    } catch {}
+    content.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><h3>' + __('error.load_title') + '</h3><p>' + __('error.load_text') + '</p></div>';
 }
 
 function renderSyncedItems(data) {

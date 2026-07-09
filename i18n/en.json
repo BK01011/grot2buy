@@ -89,6 +89,10 @@
     "emptied": "Trash emptied.",
     "confirm_empty": "Permanently delete all items in trash?"
   },
+  "offline": {
+    "cached": "Showing cached data (offline)",
+    "queued": "Will be sent later (offline)"
+  },
   "sync": {
     "start": "Syncing...",
     "success": "Sync successful.",

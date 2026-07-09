@@ -743,6 +743,26 @@ body {
     flex-shrink: 0;
 }
 
+.offline-badge {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 999;
+    background: var(--color-danger, #e53935);
+    color: white;
+    text-align: center;
+    padding: 4px 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    transform: translateY(-100%);
+    transition: transform 0.3s;
+}
+
+.offline-badge.show {
+    transform: translateY(0);
+}
+
 /* Settings */
 .settings-section {
     margin-bottom: 24px;

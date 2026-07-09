@@ -1,4 +1,4 @@
-# Grot2Buy v0.10.0
+# Grot2Buy v0.11.0
 
 Bidirektionale Synchronisation zwischen Buy Me a Pie, Grocy und lokaler Einkaufsliste.
 Architektur: Zentrale Liste (synced_items) als Wahrheitsquelle, **wer geändert hat gewinnt** (statt "Grocy immer").

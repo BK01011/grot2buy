@@ -89,6 +89,10 @@
     "emptied": "Papierkorb geleert.",
     "confirm_empty": "Alle Artikel im Papierkorb endgültig löschen?"
   },
+  "offline": {
+    "cached": "Zeige zwischengespeicherte Daten (offline)",
+    "queued": "Wird später gesendet (offline)"
+  },
   "sync": {
     "start": "Synchronisiere...",
     "success": "Sync erfolgreich.",
