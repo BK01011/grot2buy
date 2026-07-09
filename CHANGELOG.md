@@ -4,6 +4,76 @@ All changes to Grot2Buy with explanations.
 
 ---
 
+## [0.5.0] — 2026-07-09
+
+### 📱 Sync-Status-Pill + Pull-to-Refresh + Header-Redesign
+
+**New**:
+- **Sync-Status-Pill** im Header: Icon + relative Sync-Zeit, farbcodiert (grün/gelb/rot)
+- **Pull-to-Refresh**: Touch-swipe-down auf Mobilgeräten triggert Sync
+- Status persistiert in `localStorage('grot2buy_last_sync')`
+- **Header-Redesign**: Größeres Logo, kleinere Schrift, kompakteres Layout
+- Background-Sync + User-initiated Sync getrennt
+
+**Cache bust**: `?v=5` → `?v=8`, SW-Cache `grot2buy-v5` → `grot2buy-v8`
+
+**Version**: `0.4.2` → `0.5.0`
+
+---
+
+## [0.6.0] — 2026-07-09
+
+### 🔒 Security Audit (Phase 1–4) + Docker Optimization
+
+**30 Findings in 4 Phasen — alle behoben.**
+
+**Phase 1 (Critical)**:
+- CSRF eliminiert: API nur noch via `Authorization: Bearer`
+- `/api/docs/doku` + `/api/docs/changelog` mit `Depends(verify_token)`
+- Config-Import blockiert `secret_key` + `auth_token`
+- `auth_token`, `grocy_key`, `grocy_url`, `bap_pass` via Fernet verschlüsselt
+
+**Phase 2 (High)**:
+- Exception Leaks: generische Fehlermeldungen + `@app.exception_handler` für HTTPException + 500
+- Race Conditions: `asyncio.Lock` in `ShoppingSync`; `_sync_running`-Flag
+- GrocyClient `close()` + alter Client wird vor `configure_grocy()` geschlossen
+- Ephemeral BAP-Clients entfernt: alle nutzen `shopping_manager._bap`
+- CORS: `allow_origins` korrigiert
+- Atomare Saves (`.tmp` + `os.replace`)
+
+**Phase 3 (Medium)**:
+- Fernet-Key `chmod 600`
+- `set_encrypted()`/`get_decrypted()` für alle Secrets
+- 18 bare `except: pass` durch logging ersetzt
+- `/setup` prüft Config-Status
+- BAP Password nach `__init__` auf `None` gesetzt
+- Token mit 30-Tage-Expiry + `auth_token_created_at`
+- Background-Sync + User-Sync parallel via `_sync_running` + Lock
+- Dynamische Imports entfernt
+- Token-Invalidierung bei Passwort-Änderung
+
+**Phase 4 (Low)**:
+- Batch-`save()` in Config
+- Auto-Bereinigung purchased-Items nach 24h via `purchased_at`-Timestamp
+- UTC-Zeitstempel (`datetime.now(timezone.utc)`)
+- Content-Type JSON-Validierung (`JSONDecodeError` abgefangen)
+- Config-Export redacted: Secrets → `"***"`
+- Sync-Datei hat `"__version__"`-Feld
+
+**Docker Optimization**:
+- `gcc` aus apt entfernt (Wheels statt Build) → Image 367 MB → 203 MB (**−45%**)
+- `.opencode/` in `.dockerignore` (62 MB node_modules ausgeschlossen)
+- Healthcheck: timeout 15s, retries 5
+- Build Cache reduziert von 10,5 GB auf 0,4 GB
+
+**Regressionstest (16 Endpunkte)** bestanden, keine Fehler im Log
+
+**Cache bust**: `?v=8` → `?v=11`, SW-Cache `grot2buy-v8` → `grot2buy-v11`
+
+**Version**: `0.5.0` → `0.6.0`
+
+---
+
 ## [0.4.2] — 2026-07-08
 
 ### 🚀 Initialer Auto-Sync beim Seitenstart
@@ -300,6 +370,76 @@ value = Fernet(key).decrypt(token.encode()).decode()
 # Changelog — Grot2Buy
 
 Alle Änderungen an Grot2Buy mit Begründungen.
+
+---
+
+## [0.5.0] — 2026-07-09
+
+### 📱 Sync-Status-Pill + Pull-to-Refresh + Header-Redesign
+
+**Neu**:
+- **Sync-Status-Pill** im Header: Icon + relative Sync-Zeit, farbcodiert (grün/gelb/rot)
+- **Pull-to-Refresh**: Touch-swipe-down auf Mobilgeräten triggert Sync
+- Status persistiert in `localStorage('grot2buy_last_sync')`
+- **Header-Redesign**: Größeres Logo, kleinere Schrift, kompakteres Layout
+- Background-Sync + User-initiated Sync getrennt
+
+**Cache bust**: `?v=5` → `?v=8`, SW-Cache `grot2buy-v5` → `grot2buy-v8`
+
+**Version**: `0.4.2` → `0.5.0`
+
+---
+
+## [0.6.0] — 2026-07-09
+
+### 🔒 Security Audit (Phase 1–4) + Docker-Optimierung
+
+**30 Findings in 4 Phasen — alle behoben.**
+
+**Phase 1 (Critical)**:
+- CSRF eliminiert: API nur noch via `Authorization: Bearer`
+- `/api/docs/doku` + `/api/docs/changelog` mit `Depends(verify_token)`
+- Config-Import blockiert `secret_key` + `auth_token`
+- `auth_token`, `grocy_key`, `grocy_url`, `bap_pass` via Fernet verschlüsselt
+
+**Phase 2 (High)**:
+- Exception Leaks: generische Fehlermeldungen + `@app.exception_handler` für HTTPException + 500
+- Race Conditions: `asyncio.Lock` in `ShoppingSync`; `_sync_running`-Flag
+- GrocyClient `close()` + alter Client wird vor `configure_grocy()` geschlossen
+- Ephemere BAP-Clients entfernt: alle nutzen `shopping_manager._bap`
+- CORS: `allow_origins` korrigiert
+- Atomare Saves (`.tmp` + `os.replace`)
+
+**Phase 3 (Medium)**:
+- Fernet-Key `chmod 600`
+- `set_encrypted()`/`get_decrypted()` für alle Secrets
+- 18 bare `except: pass` durch logging ersetzt
+- `/setup` prüft Config-Status
+- BAP-Passwort nach `__init__` auf `None` gesetzt
+- Token mit 30-Tage-Expiry + `auth_token_created_at`
+- Background-Sync + User-Sync parallel via `_sync_running` + Lock
+- Dynamische Imports entfernt
+- Token-Invalidierung bei Passwort-Änderung
+
+**Phase 4 (Low)**:
+- Batch-`save()` in Config
+- Auto-Bereinigung purchased-Items nach 24h via `purchased_at`-Timestamp
+- UTC-Zeitstempel (`datetime.now(timezone.utc)`)
+- Content-Type JSON-Validierung (`JSONDecodeError` abgefangen)
+- Config-Export redacted: Secrets → `"***"`
+- Sync-Datei hat `"__version__"`-Feld
+
+**Docker-Optimierung**:
+- `gcc` aus apt entfernt (Wheels statt Build) → Image 367 MB → 203 MB (**−45%**)
+- `.opencode/` in `.dockerignore` (62 MB node_modules ausgeschlossen)
+- Healthcheck: timeout 15s, retries 5
+- Build Cache reduziert von 10,5 GB auf 0,4 GB
+
+**Regressionstest (16 Endpunkte)** bestanden, keine Fehler im Log
+
+**Cache bust**: `?v=8` → `?v=11`, SW-Cache `grot2buy-v8` → `grot2buy-v11`
+
+**Version**: `0.5.0` → `0.6.0`
 
 ---
 
