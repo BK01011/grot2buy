@@ -4,6 +4,24 @@ All changes to Grot2Buy with explanations.
 
 ---
 
+## [0.10.0] — 2026-07-09
+
+### 📂 Kategoriesortierung im UI (grouped by category)
+
+DE version below; English summary: items are now grouped by category headers, sorted alphabetically.
+
+- `renderSyncedItems()` uses `data.by_category` instead of flat list
+- Categories sorted alphabetically (A–Z)
+- Items within each category sorted alphabetically by name
+- Category header shows name + item count
+- New CSS: `.category-group`, `.category-header`, `.category-count`
+
+**Cache bust**: `?v=13` → `?v=14`, SW-Cache `grot2buy-v13` → `grot2buy-v14`
+
+**Version**: `0.9.0` → `0.10.0`
+
+---
+
 ## [0.9.0] — 2026-07-09
 
 ### 🗑️ Undo/Trash — deleted items are recoverable
@@ -472,6 +490,27 @@ Alle Änderungen an Grot2Buy mit Begründungen.
 **i18n**: `item.undo`, `item.restored` und gesamter `trash.*` Block in de.json/en.json
 
 **Version**: `0.8.0` → `0.9.0`
+
+---
+
+## [0.10.0] — 2026-07-09
+
+### 📂 Kategoriesortierung im UI
+
+**Problem**: Items wurden flach ohne Gruppierung angezeigt. Kategorien waren nicht sichtbar.
+
+**Lösung**: Grouped View mit Category-Headern, alphabetisch sortiert.
+
+**Frontend**:
+- `renderSyncedItems()` nutzt `data.by_category` für kategoriebasierte Darstellung
+- Kategorien alphabetisch sortiert (A–Z)
+- Items innerhalb jeder Kategorie alphabetisch sortiert
+- Category-Header zeigt Name + Anzahl der Items
+- Neue CSS-Klassen: `.category-group`, `.category-header`, `.category-count`
+
+**Cache bust**: `?v=13` → `?v=14`, SW-Cache `grot2buy-v13` → `grot2buy-v14`
+
+**Version**: `0.9.0` → `0.10.0`
 
 ---
 

@@ -389,6 +389,7 @@ async function loadItems() {
 function renderSyncedItems(data) {
     const content = document.getElementById('content');
     const items = data.items || [];
+    const byCategory = data.by_category || {};
 
     document.getElementById('itemCountValue').textContent = items.length;
 
@@ -397,9 +398,20 @@ function renderSyncedItems(data) {
         return;
     }
 
+    const sortedCategories = Object.keys(byCategory).sort((a, b) => a.localeCompare(b));
+
     content.innerHTML = `
         <div class="item-list">
-            ${items.map(item => renderItem(item)).join('')}
+            ${sortedCategories.map(cat => {
+                const catItems = byCategory[cat];
+                const sortedItems = catItems.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+                return `
+                    <div class="category-group">
+                        <div class="category-header">${escapeHtml(cat)} <span class="category-count">${sortedItems.length}</span></div>
+                        ${sortedItems.map(item => renderItem(item)).join('')}
+                    </div>
+                `;
+            }).join('')}
         </div>
     `;
 }

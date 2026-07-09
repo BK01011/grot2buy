@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-VERSION = "0.9.0"
+VERSION = "0.10.0"
 
 logging.basicConfig(
     level=logging.INFO,
