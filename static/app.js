@@ -821,6 +821,88 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
+// ─── Docs Viewer ─────────────────────────────────────────────
+
+function renderMarkdown(md) {
+    const lines = md.split('\n');
+    let html = '';
+    let inCode = false;
+    let codeBuf = [];
+    let inList = false;
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+
+        if (line.startsWith('```')) {
+            if (inCode) {
+                html += '<pre><code>' + escapeHtml(codeBuf.join('\n')) + '</code></pre>\n';
+                codeBuf = [];
+                inCode = false;
+            } else {
+                inCode = true;
+            }
+            continue;
+        }
+        if (inCode) { codeBuf.push(line); continue; }
+
+        if (line.startsWith('### ')) {
+            if (inList) { html += '</ul>\n'; inList = false; }
+            html += '<h3>' + escapeHtml(line.slice(4)) + '</h3>\n';
+            continue;
+        }
+        if (line.startsWith('## ')) {
+            if (inList) { html += '</ul>\n'; inList = false; }
+            html += '<h2>' + escapeHtml(line.slice(3)) + '</h2>\n';
+            continue;
+        }
+        if (line.startsWith('# ')) {
+            if (inList) { html += '</ul>\n'; inList = false; }
+            html += '<h1>' + escapeHtml(line.slice(2)) + '</h1>\n';
+            continue;
+        }
+
+        if (line.startsWith('- ') || line.startsWith('* ')) {
+            if (!inList) { html += '<ul>\n'; inList = true; }
+            html += '<li>' + escapeHtml(line.slice(2)) + '</li>\n';
+            continue;
+        }
+
+        if (line.match(/^\d+\.\s/)) {
+            if (!inList) { html += '<ol>\n'; inList = 'ol'; }
+            html += '<li>' + escapeHtml(line.replace(/^\d+\.\s/, '')) + '</li>\n';
+            continue;
+        }
+
+        if (line.trim() === '') {
+            if (inList) { html += '</ul>\n'; inList = false; }
+            continue;
+        }
+
+        if (line.startsWith('---')) {
+            if (inList) { html += '</ul>\n'; inList = false; }
+            html += '<hr>\n';
+            continue;
+        }
+
+        if (inList) { html += '</ul>\n'; inList = false; }
+        html += '<p>' + escapeHtml(line) + '</p>\n';
+    }
+    if (inCode) html += '<pre><code>' + escapeHtml(codeBuf.join('\n')) + '</code></pre>\n';
+    if (inList) html += '</ul>\n';
+    return html;
+}
+
+async function openDocs(type) {
+    try {
+        const data = await api('/api/docs/' + type);
+        document.getElementById('docsModalTitle').textContent = data.title || (type === 'doku' ? __('settings.docs_doku') : __('settings.docs_changelog'));
+        document.getElementById('docsBody').innerHTML = renderMarkdown(data.content);
+        document.getElementById('docsModal').classList.add('open');
+    } catch (e) {
+        toast(__('error.load_title'));
+    }
+}
+
 // Enter zum Hinzufügen
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && document.getElementById('addModal').classList.contains('open')) {

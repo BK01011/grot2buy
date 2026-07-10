@@ -913,13 +913,23 @@ async def websocket_endpoint(websocket: WebSocket):
 # ─── API: Downloads ─────────────────────────────────────────────
 
 @app.get("/api/docs/doku", tags=["Docs"])
-async def download_doku(_: bool = Depends(verify_token)):
-    return FileResponse("DOKU.md", media_type="text/markdown", filename="DOKU.md")
+async def get_doku(_: bool = Depends(verify_token)):
+    try:
+        with open("DOKU.md", "r", encoding="utf-8") as f:
+            content = f.read()
+        return {"title": "Dokumentation", "content": content}
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
 @app.get("/api/docs/changelog", tags=["Docs"])
-async def download_changelog(_: bool = Depends(verify_token)):
-    return FileResponse("CHANGELOG.md", media_type="text/markdown", filename="CHANGELOG.md")
+async def get_changelog(_: bool = Depends(verify_token)):
+    try:
+        with open("CHANGELOG.md", "r", encoding="utf-8") as f:
+            content = f.read()
+        return {"title": "Changelog", "content": content}
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
 if __name__ == "__main__":

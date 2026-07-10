@@ -559,6 +559,70 @@ body {
     padding: 20px;
 }
 
+.docs-modal {
+    max-height: 85vh;
+}
+
+.docs-body {
+    font-size: 0.85rem;
+    line-height: 1.6;
+}
+
+.docs-body h1 {
+    font-size: 1.2rem;
+    margin: 0 0 12px;
+    color: var(--primary);
+}
+
+.docs-body h2 {
+    font-size: 1rem;
+    margin: 20px 0 8px;
+    color: var(--text);
+}
+
+.docs-body h3 {
+    font-size: 0.9rem;
+    margin: 16px 0 6px;
+    color: var(--text);
+}
+
+.docs-body p {
+    margin: 6px 0;
+    color: var(--text-secondary);
+}
+
+.docs-body ul, .docs-body ol {
+    margin: 6px 0;
+    padding-left: 20px;
+}
+
+.docs-body li {
+    margin: 3px 0;
+    color: var(--text-secondary);
+}
+
+.docs-body hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 16px 0;
+}
+
+.docs-body pre {
+    background: var(--surface-alt);
+    border-radius: 8px;
+    padding: 12px;
+    overflow-x: auto;
+    font-size: 0.78rem;
+    line-height: 1.4;
+}
+
+.docs-body code {
+    background: var(--surface-alt);
+    padding: 1px 4px;
+    border-radius: 4px;
+    font-size: 0.78rem;
+}
+
 .modal-footer {
     display: flex;
     gap: 12px;
