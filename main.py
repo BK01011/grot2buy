@@ -6,6 +6,7 @@ Lizenz: MIT
 Erstellt mit KI-Unterstützung (opencode, Claude).
 """
 import json
+import re
 import secrets
 import hashlib
 import logging
@@ -912,12 +913,75 @@ async def websocket_endpoint(websocket: WebSocket):
 
 # ─── API: Downloads ─────────────────────────────────────────────
 
+def _md_to_html(md: str) -> str:
+    """Minimaler Markdown→HTML Renderer (Server-seitig)."""
+    lines = md.split('\n')
+    html = []
+    in_code = False
+    code_buf = []
+    in_list = False
+
+    def flush():
+        nonlocal in_list
+        if in_list:
+            html.append('</ul>\n')
+            in_list = False
+
+    def esc(s):
+        return s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+
+    def inline(s):
+        s = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', s)
+        s = re.sub(r'`(.+?)`', r'<code>\1</code>', s)
+        return s
+
+    for line in lines:
+        if line.startswith('```'):
+            if in_code:
+                html.append('<pre><code>' + esc('\n'.join(code_buf)) + '</code></pre>\n')
+                code_buf = []
+                in_code = False
+            else:
+                in_code = True
+            continue
+        if in_code:
+            code_buf.append(line)
+            continue
+
+        if line.startswith('### '):
+            flush(); html.append('<h3>' + inline(esc(line[4:])) + '</h3>\n')
+        elif line.startswith('## '):
+            flush(); html.append('<h2>' + inline(esc(line[3:])) + '</h2>\n')
+        elif line.startswith('# '):
+            flush(); html.append('<h1>' + inline(esc(line[2:])) + '</h1>\n')
+        elif line.startswith('- ') or line.startswith('* '):
+            if not in_list:
+                html.append('<ul>\n'); in_list = True
+            html.append('<li>' + inline(esc(line[2:])) + '</li>\n')
+        elif re.match(r'^\d+\.\s', line):
+            if not in_list:
+                html.append('<ol>\n'); in_list = 'ol'
+            html.append('<li>' + inline(esc(re.sub(r'^\d+\.\s', '', line))) + '</li>\n')
+        elif line.strip() == '':
+            flush()
+        elif line.startswith('---'):
+            flush(); html.append('<hr>\n')
+        else:
+            flush(); html.append('<p>' + inline(esc(line)) + '</p>\n')
+
+    if in_code:
+        html.append('<pre><code>' + esc('\n'.join(code_buf)) + '</code></pre>\n')
+    if in_list:
+        html.append('</ul>\n')
+    return ''.join(html)
+
+
 @app.get("/api/docs/doku", tags=["Docs"])
 async def get_doku(_: bool = Depends(verify_token)):
     try:
         with open("DOKU.md", "r", encoding="utf-8") as f:
             content = f.read()
-        return {"title": "Dokumentation", "content": content}
+        return {"title": "Dokumentation", "html": _md_to_html(content)}
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
@@ -927,7 +991,7 @@ async def get_changelog(_: bool = Depends(verify_token)):
     try:
         with open("CHANGELOG.md", "r", encoding="utf-8") as f:
             content = f.read()
-        return {"title": "Changelog", "content": content}
+        return {"title": "Changelog", "html": _md_to_html(content)}
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 

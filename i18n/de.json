@@ -60,6 +60,7 @@
     "docs_section": "Dokumentation",
     "docs_doku": "Dokumentation anzeigen",
     "docs_changelog": "Changelog anzeigen",
+    "error_load_docs": "Fehler beim Laden der Dokumentation",
     "appearance_section": "Darstellung",
     "darkmode_label": "Dark Mode",
     "darkmode_auto": "Automatisch",

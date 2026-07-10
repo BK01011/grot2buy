@@ -894,12 +894,14 @@ function renderMarkdown(md) {
 
 async function openDocs(type) {
     try {
-        const data = await api('/api/docs/' + type);
+        const data = await api('/docs/' + type);
+        if (!data || !data.html) throw new Error('empty response');
         document.getElementById('docsModalTitle').textContent = data.title || (type === 'doku' ? __('settings.docs_doku') : __('settings.docs_changelog'));
-        document.getElementById('docsBody').innerHTML = renderMarkdown(data.content);
+        document.getElementById('docsBody').innerHTML = data.html;
         document.getElementById('docsModal').classList.add('open');
     } catch (e) {
-        toast(__('error.load_title'));
+        console.error('Docs fetch error:', e);
+        toast(__('settings.error_load_docs'));
     }
 }
 
