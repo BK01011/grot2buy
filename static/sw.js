@@ -1,11 +1,11 @@
-const CACHE = 'grot2buy-v15';
+const CACHE = 'grot2buy-v17';
 
 const PRECACHE = [
-  '/?sw=v8',
-  '/static/style.css?v=15',
-  '/static/app.js?v=15',
-  '/static/logo.svg?v=15',
-  '/static/manifest.json?v=15',
+  '/?sw=v10',
+  '/static/style.css?v=17',
+  '/static/app.js?v=17',
+  '/static/logo.svg?v=17',
+  '/static/manifest.json?v=17',
 ];
 
 self.addEventListener('install', (event) => {

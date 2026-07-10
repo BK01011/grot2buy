@@ -93,6 +93,10 @@ function connectWebSocket() {
     ws = new WebSocket(`${protocol}//${location.host}/ws`);
 
     ws.onopen = () => {
+        if (wsReconnectAttempts > 0 || !lastSyncOk) {
+            loadItems();
+            loadLists();
+        }
         wsReconnectAttempts = 0;
     };
 
@@ -167,26 +171,16 @@ function refreshPillTime() {
 
 function updateSyncStatus(ok, timeStr) {
     const pill = document.getElementById('syncStatus');
-    const icon = document.getElementById('pillIcon');
-    const path = document.getElementById('pillPath');
     const text = document.getElementById('pillText');
-    if (!pill || !icon || !path || !text) return;
+    if (!pill || !text) return;
 
     if (ok) {
         pill.dataset.status = 'ok';
-        path.setAttribute('d', 'M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z');
         text.textContent = timeStr || __('sync.status_ok');
     } else {
         pill.dataset.status = 'error';
-        path.setAttribute('d', 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z');
         text.textContent = __('sync.status_never');
     }
-}
-
-function updatePillAuto(interval) {
-    const el = document.getElementById('pillAuto');
-    if (!el) return;
-    el.textContent = interval && interval > 0 ? interval + 'm' : '';
 }
 
 function formatTime(iso) {
@@ -210,32 +204,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (lastSync) {
         updateSyncStatus(true, formatTime(lastSync));
     }
+    startSyncTimer(2);
 
-    try {
-        const cfg = await api('/config');
-        updatePillAuto(cfg.sync_interval);
-        startSyncTimer(cfg.sync_interval);
-    } catch (e) {
-        startSyncTimer(0);
-    }
-
-    try {
-        await api('/sync/full');
-        const now = new Date().toISOString();
-        localStorage.setItem('grot2buy_last_sync', now);
-        updateSyncStatus(true, formatTime(now));
-        lastSyncOk = true;
-        lastSyncTime = now;
-    } catch (e) {
-        console.error('Initial sync failed:', e);
-        updateSyncStatus(false);
-    }
-
+    // Data first, sync im Hintergrund
     await Promise.all([
         loadCategories(),
         loadLists(),
         loadItems(),
     ]);
+
+    api('/sync/full').then(result => {
+        const now = new Date().toISOString();
+        localStorage.setItem('grot2buy_last_sync', now);
+        updateSyncStatus(true, formatTime(now));
+        lastSyncOk = true;
+        lastSyncTime = now;
+        return Promise.all([
+            loadCategories(),
+            loadLists(),
+            loadItems(),
+        ]);
+    }).catch(e => {
+        console.error('Initial sync failed:', e);
+        updateSyncStatus(false);
+    });
 });
 
 // ─── Pull to Refresh ─────────────────────────────────────────
@@ -682,8 +674,6 @@ async function syncWithBAP() {
     try {
         const res = await api('/sync/full');
         toast(res.result);
-        await loadLists();
-        await loadItems();
         const now = new Date().toISOString();
         localStorage.setItem('grot2buy_last_sync', now);
         lastSyncTime = now;
@@ -716,7 +706,6 @@ async function openSettings() {
     try {
         const data = await api('/config');
         document.getElementById('bapUser').value = data.bap_user || '';
-        document.getElementById('syncInterval').value = data.sync_interval ?? 5;
     } catch (e) {}
     const sel = document.getElementById('darkModeSelect');
     if (sel) sel.value = localStorage.getItem('grot2buy_theme') || 'auto';
@@ -734,18 +723,6 @@ async function saveBAPConfig() {
     toast(res.result);
     closeModal('settingsModal');
     loadLists();
-}
-
-async function saveSyncInterval() {
-    const interval = parseInt(document.getElementById('syncInterval').value) || 0;
-    const res = await api('/config/sync-interval', {
-        method: 'POST',
-        body: JSON.stringify({ interval }),
-    });
-    toast(res.result);
-    updatePillAuto(interval);
-    startSyncTimer(interval);
-    closeModal('settingsModal');
 }
 
 async function exportList() {

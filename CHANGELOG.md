@@ -4,20 +4,21 @@ All changes to Grot2Buy with explanations.
 
 ---
 
-## [0.12.0] — 2026-07-09
+## [0.13.0] — 2026-07-10
 
-### 📖 API-Dokumentation (Swagger/OpenAPI)
+### ⚡ Performance + UI-Optimierung
 
-English summary: FastAPI auto-generates OpenAPI docs at `/api/docs` and `/api/redoc` with Bearer auth.
+English summary: Async background sync, removed sync interval from settings, move sync pill in header.
 
-- `tags_metadata` with 7 endpoint groups (Items, Sync, Trash, Config, System, WebSocket, Docs)
-- All endpoints tagged for OpenAPI grouping
-- `summary=` description on key API endpoints
-- HTTPBearer security scheme with `persistAuthorization`
-- Metadata: version, contact, license info
-- `docs_url` and `redoc_url` moved to `/api/docs` and `/api/redoc`
+- Initialer Sync läuft jetzt **nach** dem Daten-Laden im Hintergrund (sofortige Content-Anzeige)
+- Sync-Intervall aus Einstellungen entfernt (WebSocket macht es obsolet)
+- Sync-Pill aus Header-Buttons ins `.sync-bar` direkt unterhalb der Schaltflächen verschoben
+- Sync-Pill zeigt jetzt festes Sync-Icon (Pfeilkreis) statt wechselndem Check/Warning
+- Hintergrund-Auto-Sync läuft fest auf 5 Minuten
+- `updatePillAuto()` und zugehörige HTML-Elemente entfernt
+- iOS PWA lädt spürbar schneller
 
-**Version**: `0.11.0` → `0.12.0`
+**Version**: `0.12.0` → `0.13.0`
 
 ---
 

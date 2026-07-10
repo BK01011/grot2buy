@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-VERSION = "0.12.0"
+VERSION = "0.13.0"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -33,6 +33,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, File
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from modules.config import config
 from modules.shopping import shopping_manager
@@ -84,7 +85,9 @@ def verify_password(password: str, stored: str) -> bool:
 
 
 def verify_token(request: Request) -> bool:
-    if not config.get_decrypted("password", ""):
+    if not config.is_setup_complete:
+        return True
+    if not config.get("password", ""):
         return True
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
@@ -254,6 +257,20 @@ async def generic_exception_handler(request, exc):
     )
 
 
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        response.headers["Content-Security-Policy"] = "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' ws:; img-src 'self' data:; font-src 'self'"
+        return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -282,14 +299,14 @@ async def setup_page(request: Request):
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
-    if not config.get_decrypted("password", ""):
+    if not config.is_setup_complete:
         return RedirectResponse("/", status_code=303)
     return templates.TemplateResponse(request, "login.html", template_context(request))
 
 
 @app.post("/login")
 async def login_submit(request: Request, password: str = Form("")):
-    stored_pass = config.get_decrypted("password", "")
+    stored_pass = config.get("password", "")
     if stored_pass and verify_password(password, stored_pass):
         token = secrets.token_urlsafe(32)
         config.set_auth_token(token)
@@ -575,6 +592,7 @@ async def api_sync_push(_: bool = Depends(verify_token)):
             return JSONResponse({"result": "Keine BAP-Verbindung"})
         result = shopping_sync.push_to_buymeapie(client)
         logger.info(f"BAP-Push: {result}")
+        await broadcast_items_updated()
         return JSONResponse({"result": result})
     except Exception as e:
         logger.error(f"BAP-Push-Fehler: {e}")
@@ -590,6 +608,7 @@ async def api_sync_pull(_: bool = Depends(verify_token)):
         grocy = shopping_manager._grocy
         result = shopping_sync.pull_purchased_from_bap(client, grocy)
         logger.info(f"BAP-Pull: {result}")
+        await broadcast_items_updated()
         return JSONResponse({"result": result})
     except Exception as e:
         logger.error(f"BAP-Pull-Fehler: {e}")
@@ -641,6 +660,7 @@ async def api_sync_grocy_push(_: bool = Depends(verify_token)):
     try:
         result = shopping_sync.push_to_grocy(grocy)
         logger.info(f"Grocy-Push: {result}")
+        await broadcast_items_updated()
         return JSONResponse({"result": result})
     except Exception as e:
         logger.error(f"Grocy-Push-Fehler: {e}")
@@ -664,6 +684,7 @@ async def api_sync_grocy_pull(_: bool = Depends(verify_token)):
         lang = config.get("lang", "de")
         result = i18n_t("sync.pull_success", lang, n=str(added))
         logger.info(f"Grocy-Pull: {result}")
+        await broadcast_items_updated()
         return JSONResponse({"result": result})
     except Exception as e:
         logger.error(f"Grocy-Pull-Fehler: {e}")
@@ -722,6 +743,7 @@ async def api_synced_reset(_: bool = Depends(verify_token)):
     shopping_sync._removed = []
     shopping_sync.save()
     result = await shopping_sync.sync_full(shopping_manager._grocy, shopping_manager._bap)
+    await broadcast_items_updated()
     return JSONResponse({"result": result, "count": len(shopping_sync._synced_items)})
 
 
@@ -882,10 +904,10 @@ async def websocket_endpoint(websocket: WebSocket):
                     logger.error(f"WS-Sync-Fehler: {e}")
                     await websocket.send_json({"type": "error", "message": str(e)})
     except WebSocketDisconnect:
-        ws_manager.disconnect(websocket)
+        await ws_manager.disconnect(websocket)
     except Exception as e:
         logger.debug(f"WS-Fehler: {e}")
-        ws_manager.disconnect(websocket)
+        await ws_manager.disconnect(websocket)
 
 
 # ─── API: Downloads ─────────────────────────────────────────────

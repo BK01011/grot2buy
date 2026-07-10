@@ -54,6 +54,9 @@ class Config:
             except (json.JSONDecodeError, OSError) as e:
                 logger.error(f"Config-Datei korrupt: {e}")
                 self._data = {}
+        if self.auth_token and not self._data.get("auth_token_created_at"):
+            self._data["auth_token_created_at"] = datetime.now(timezone.utc).isoformat()
+            self.save()
 
     def save(self):
         DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -173,15 +176,16 @@ class Config:
         if not stored:
             return False
         created_at = self._data.get("auth_token_created_at")
-        if created_at:
-            try:
-                created = datetime.fromisoformat(created_at)
-                if created.tzinfo is None:
-                    created = created.replace(tzinfo=timezone.utc)
-                if (datetime.now(timezone.utc) - created).days >= self.TOKEN_MAX_AGE_DAYS:
-                    return False
-            except Exception:
-                pass
+        if not created_at:
+            return False
+        try:
+            created = datetime.fromisoformat(created_at)
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=timezone.utc)
+            if (datetime.now(timezone.utc) - created).days >= self.TOKEN_MAX_AGE_DAYS:
+                return False
+        except Exception:
+            return False
         return secrets.compare_digest(token, stored)
 
     def reset_auth_tokens(self):

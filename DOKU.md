@@ -154,7 +154,7 @@ docker compose logs -f
 curl -k https://localhost:8899/health
 
 # Expected response:
-# {"status":"ok","service":"grot2buy","version":"0.4.0"}
+# {"status":"ok","service":"grot2buy","version":"0.13.0"}
 ```
 
 ### 4. Enable auto-start on system boot
@@ -734,7 +734,7 @@ docker compose logs -f
 curl -k https://localhost:8899/health
 
 # Erwartete Antwort:
-# {"status":"ok","service":"grot2buy","version":"0.4.0"}
+# {"status":"ok","service":"grot2buy","version":"0.13.0"}
 ```
 
 ### 4. Auto-Start bei Systemstart aktivieren
