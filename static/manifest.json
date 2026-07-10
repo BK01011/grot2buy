@@ -10,10 +10,22 @@
   "categories": ["utilities", "shopping", "lifestyle"],
   "icons": [
     {
-      "src": "/static/logo.svg?v=15",
+      "src": "/static/logo-192.png?v=17",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/logo-512.png?v=17",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/logo.svg?v=17",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ]
 }
