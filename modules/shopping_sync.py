@@ -15,13 +15,15 @@ SYNC_VERSION = 1
 
 
 def _utcnow() -> datetime:
+    """Gibt die aktuelle UTC-Zeit zurück."""
     return datetime.now(timezone.utc)
 
 
 def _atomic_write(path: Path, content: str):
+    """Schreibt eine Datei atomar via .tmp-Datei, um Datenverlust zu vermeiden."""
     tmp = path.with_suffix(".tmp")
     tmp.write_text(content, encoding="utf-8")
-    os.chmod(str(tmp), 0o600)
+    os.chmod(str(tmp), 0o600)  # nur Besitzer darf lesen
     tmp.replace(path)
 
 
@@ -29,11 +31,19 @@ SYNC_DATA_VERSION = 2
 
 
 class ShoppingSync:
+    """Zentrale Synchronisations-Engine zwischen Grocy und Buy Me a Pie.
+
+    Die synced_items-Liste ist die Quelle der Wahrheit. Änderungen in Grocy
+    oder BAP werden bidirektional abgeglichen nach dem Prinzip „wer zuletzt
+    geändert hat, gewinnt".
+    """
+
     def __init__(self):
+        """Initialisiert den Sync-Manager mit leeren Listen und lädt persistierte Daten."""
         self._synced_items: list[dict] = []
-        self._removed: list[str] = []
-        self._removed_set: set[str] = set()
-        self._trash: list[dict] = []
+        self._removed: list[str] = []        # dauerhaft entfernte Artikel
+        self._removed_set: set[str] = set()  # normalisierte Namen für schnelle Suche
+        self._trash: list[dict] = []         # Papierkorb (wiederherstellbar)
         self._lock = asyncio.Lock()
         self._sync_running = False
         self._linked_bap = None
@@ -41,6 +51,7 @@ class ShoppingSync:
         self.load()
 
     def load(self):
+        """Lädt synced_items, removed und trash aus der verschlüsselten JSON-Datei."""
         if SYNC_FILE.exists():
             try:
                 raw = SYNC_FILE.read_text()
@@ -57,7 +68,7 @@ class ShoppingSync:
                     self._trash = data.get("trash", [])
                     ver = data.get("__version__", 0)
                     if ver < 2:
-                        self._trash = []
+                        self._trash = []  # alte Version hatte noch keinen Papierkorb
                 else:
                     self._synced_items = []
                     self._removed = []
@@ -71,6 +82,7 @@ class ShoppingSync:
                 self._trash = []
 
     def save(self):
+        """Verschlüsselt alle Daten und schreibt sie atomar in die Sync-Datei."""
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         try:
             self._removed_set = {self._norm(r) for r in self._removed}
@@ -86,6 +98,7 @@ class ShoppingSync:
             logger.error(f"Sync-Datei schreiben fehlgeschlagen: {e}")
 
     def backup(self) -> str:
+        """Erstellt ein Backup der Sync-Datei mit Zeitstempel im Dateinamen."""
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_path = DATA_DIR / f"shopping_sync_backup_{ts}.json"
@@ -96,9 +109,11 @@ class ShoppingSync:
         return str(backup_path)
 
     def _norm(self, name: str) -> str:
+        """Normalisiert einen Namen: Kleinbuchstaben, ohne Leerzeichen an den Enden."""
         return name.lower().strip()
 
     def _find(self, name: str) -> Optional[dict]:
+        """Sucht nach einem Artikel in der synced-Liste (auch gekauft)."""
         nn = self._norm(name)
         for item in self._synced_items:
             if self._norm(item.get("name", "")) == nn:
@@ -106,6 +121,7 @@ class ShoppingSync:
         return None
 
     def _find_active(self, name: str) -> Optional[dict]:
+        """Sucht nach einem aktiven (nicht gekauften) Artikel in der synced-Liste."""
         nn = self._norm(name)
         for item in self._synced_items:
             if not item.get("purchased") and self._norm(item.get("name", "")) == nn:
@@ -113,23 +129,33 @@ class ShoppingSync:
         return None
 
     def _is_removed(self, name: str) -> bool:
+        """Prüft, ob ein Artikel dauerhaft entfernt wurde."""
         return self._norm(name) in self._removed_set
 
     async def acquire_lock(self):
+        """Sperrt den Sync, blockiert bis verfügbar."""
         await self._lock.acquire()
         self._sync_running = True
 
     def release_lock(self):
+        """Gibt die Sync-Sperre wieder frei."""
         self._sync_running = False
         self._lock.release()
 
     def link_clients(self, bap=None, grocy=None):
+        """Verknüpft BAP/Grocy-Clients für Propagierung von Änderungen."""
         self._linked_bap = bap
         self._linked_grocy = grocy
 
     # ─── Sync ──────────────────────────────────────────────────
 
     async def sync_full(self, grocy_client, bap_client, is_initial: bool = False) -> str:
+        """Führt einen vollständigen bidirektionalen Sync zwischen Grocy und BAP durch.
+
+        Sammelt Änderungen von beiden Seiten, gleicht sie mit der zentralen Liste ab
+        und propagiert Aktualisierungen zurück. is_initial=True importiert auch bereits
+        gekaufte BAP-Artikel als aktiv.
+        """
         async with self._lock:
             self._sync_running = True
             try:
@@ -138,10 +164,12 @@ class ShoppingSync:
                 self._sync_running = False
 
     def _sync_full_inner(self, grocy_client, bap_client, is_initial: bool = False) -> str:
+        """Führt die eigentliche Sync-Logik aus (muss unter Lock aufgerufen werden)."""
         log = []
         log.append("=== SYNC START ===")
 
         # ── 1. BAP lesen ─────────────────────────────────────
+        # Sammelt alle aktiven und gekauften Artikel aus Buy Me a Pie
         bap_active = {}
         bap_purchased = {}
         bap_purchased_all = {}
@@ -162,6 +190,7 @@ class ShoppingSync:
                         nn = self._norm(title)
                         if not nn:
                             continue
+                        # Menge aus dem amount-String parsen (z.B. "3×" → 3)
                         bap_amount = item.get("amount", "")
                         qty = 1
                         if bap_amount:
@@ -180,6 +209,7 @@ class ShoppingSync:
                 log.append(f"BAP Fehler: {e}")
 
         # ── 2. Grocy lesen ────────────────────────────────────
+        # Sammelt alle aktiven und erledigten Artikel aus Grocy
         grocy_active = {}
         grocy_done = {}
         grocy_dup_ids = {}
@@ -201,6 +231,7 @@ class ShoppingSync:
                 log.append(f"Grocy Fehler: {e}")
 
         # ── 3. Synced-Index aufbauen ──────────────────────────
+        # Baut einen schnellen Lookup-Index über die normalisierten Namen
         synced_by_nn = {}
         for item in self._synced_items:
             nn = self._norm(item.get("name", ""))
@@ -209,6 +240,7 @@ class ShoppingSync:
         log.append(f"Synced: {list(synced_by_nn.keys())}")
 
         # ── 4. Neue Artikel aus BAP/Grocy in synced mergen ────
+        # Artikel die nur in einer Quelle existieren werden in die Zentralliste übernommen
         fresh_items = set()
         now_ts = _utcnow().isoformat()
 
@@ -254,12 +286,15 @@ class ShoppingSync:
                 log.append(f"  Neu in synced (Grocy done): {entry['product_name']}")
 
         # ── 5. Synced-Status aus Quellen aktualisieren ────────
+        # Vergleicht den purchased-Status jedes Artikels zwischen synced und beiden Quellen.
+        # Bei Änderungen: wer geändert hat gewinnt. Bei Konflikt: Grocy gewinnt.
         now = _utcnow()
         for nn, item in synced_by_nn.items():
             synced_purchased = item.get("purchased", False)
             name = item["name"]
             qty = item.get("quantity", 1)
             added_at = item.get("added_at")
+            # Kürzlich manuell hinzugefügte Artikel schützen vor sofortigem Gekauft-Status
             recently_manual = (
                 item.get("source") == "manual"
                 and added_at
@@ -329,6 +364,7 @@ class ShoppingSync:
                 item["quantity"] = grocy_active[nn].get("amount", qty)
 
         # ── 6. Purchased-Cleanup: älter als 30 Tage (oder ohne Datum) entfernen ──
+        # Verhindert unbegrenztes Anwachsen der Liste durch alte gekaufte Einträge
         cutoff = now - timedelta(days=30)
         before = len(self._synced_items)
         self._synced_items = [
@@ -341,10 +377,12 @@ class ShoppingSync:
             log.append(f"  🧹 {removed_count} alte gekaufte Einträge entfernt")
 
         # ── 7. Actions bauen ───────────────────────────────────
+        # Bereitet alle nötigen Schreiboperationen vor, die dann ausgeführt werden
         actions = {"add_bap": [], "add_grocy": [],
                    "mark_purchased_bap": [], "mark_done_grocy": [],
                    "revert_grocy": [], "del_bap": [], "del_grocy_active": []}
 
+        # Duplikate in Grocy bereinigen: alle bis auf den letzten Eintrag löschen
         for nn, entries in grocy_dup_ids.items():
             if len(entries) > 1:
                 for dup in entries[:-1]:
@@ -360,6 +398,7 @@ class ShoppingSync:
                        f"grocy_akt={nn in grocy_active}, grocy_done={nn in grocy_done}")
 
             if is_purchased:
+                # Artikel ist gekauft → in beiden Quellen als erledigt markieren
                 if nn in bap_active:
                     actions["mark_purchased_bap"].append(bap_active[nn])
                 if nn in grocy_active:
@@ -369,6 +408,7 @@ class ShoppingSync:
                     else:
                         actions["mark_done_grocy"].append(grocy_active[nn])
             else:
+                # Artikel ist aktiv → in beiden Quellen als aktiv sicherstellen
                 if nn in bap_purchased_all:
                     for e in bap_purchased_all[nn]:
                         actions["del_bap"].append(e)
@@ -386,6 +426,7 @@ class ShoppingSync:
                     log.append(f"  → Grocy +{name}")
 
         # ── 7. Actions ausführen ───────────────────────────────
+        # Neue Artikel hinzufügen
         for a in actions["add_bap"]:
             try:
                 bap_client.add_item(a["list_id"], a["name"], a["qty"])
@@ -399,6 +440,7 @@ class ShoppingSync:
             except Exception as e:
                 log.append(f"  ✗ Grocy +{a['name']}: {e}")
 
+        # Als gekauft markieren
         for a in actions["mark_purchased_bap"]:
             try:
                 bap_client.mark_purchased(a["list_id"], a["item_id"])
@@ -412,6 +454,7 @@ class ShoppingSync:
             except Exception as e:
                 log.append(f"  ✗ Grocy done: {e}")
 
+        # Löschen
         for a in actions["del_grocy_active"]:
             try:
                 grocy_client.remove_from_shopping_list(a["id"])
@@ -419,6 +462,7 @@ class ShoppingSync:
             except Exception as e:
                 log.append(f"  ✗ Grocy del active: {e}")
 
+        # Erledigt rückgängig
         for a in actions["revert_grocy"]:
             try:
                 grocy_client.revert_done(a["id"])
@@ -426,6 +470,7 @@ class ShoppingSync:
             except Exception as e:
                 log.append(f"  ✗ Grocy revert: {e}")
 
+        # Aus BAP löschen
         for a in actions["del_bap"]:
             try:
                 bap_client.delete_item(a["list_id"], a["item_id"])
@@ -434,6 +479,7 @@ class ShoppingSync:
                 log.append(f"  ✗ BAP del: {e}")
 
         # ── 8. Alte purchased-Einträge bereinigen (>24h) ──────
+        # Entfernt gekaufte Artikel aus der Zentralliste, die älter als 24h sind
         cutoff = _utcnow() - timedelta(hours=24)
         before = len(self._synced_items)
         cleaned = []
@@ -452,6 +498,7 @@ class ShoppingSync:
         self._synced_items = cleaned
         removed_old = before - len(self._synced_items)
 
+        # Removed-Liste aufräumen: nur noch Namen behalten, die nicht aktiv sind
         all_active = set()
         for item in self._synced_items:
             if not item.get("purchased"):
@@ -478,7 +525,9 @@ class ShoppingSync:
     # ─── CRUD ──────────────────────────────────────────────────
 
     async def add_item(self, name: str, quantity: int = 1, category: str = "", source: str = "manual") -> str:
+        """Fügt einen Artikel zur zentralen Liste hinzu oder erhöht die Menge."""
         async with self._lock:
+            # Aus der Removed-Liste nehmen, falls der Artikel erneut hinzugefügt wird
             if self._is_removed(name):
                 nn = self._norm(name)
                 self._removed = [r for r in self._removed if self._norm(r) != nn]
@@ -496,6 +545,7 @@ class ShoppingSync:
         return f"✅ '{name}' hinzugefügt."
 
     def propagate_add(self, name: str, quantity: int = 1):
+        """Propagiert das Hinzufügen eines Artikels an BAP und/oder Grocy."""
         bap_client = getattr(self, '_linked_bap', None)
         grocy_client = getattr(self, '_linked_grocy', None)
         if bap_client:
@@ -514,6 +564,7 @@ class ShoppingSync:
                 logger.debug(f"Grocy propagate_add: {e}")
 
     async def remove_item(self, name: str) -> str:
+        """Verschiebt einen Artikel in den Papierkorb (soft delete)."""
         async with self._lock:
             self._removed.append(name)
             self._removed_set.add(self._norm(name))
@@ -536,6 +587,7 @@ class ShoppingSync:
         return f"✅ '{name}' in den Papierkorb verschoben."
 
     def propagate_remove(self, name: str):
+        """Propagiert das Löschen eines Artikels an BAP und/oder Grocy."""
         bap_client = getattr(self, '_linked_bap', None)
         grocy_client = getattr(self, '_linked_grocy', None)
         if bap_client:
@@ -560,9 +612,11 @@ class ShoppingSync:
                 logger.debug(f"Grocy propagate_remove: {e}")
 
     def get_trash(self) -> list[dict]:
+        """Gibt den Papierkorb als Liste zurück."""
         return list(self._trash)
 
     async def restore_item(self, name: str) -> str:
+        """Stellt einen Artikel aus dem Papierkorb wieder her."""
         async with self._lock:
             for i, t in enumerate(self._trash):
                 if self._norm(t.get("name", "")) == self._norm(name):
@@ -576,12 +630,13 @@ class ShoppingSync:
             return f"❌ '{name}' nicht im Papierkorb gefunden."
 
     async def empty_trash(self, bap_client=None, grocy_client=None) -> str:
+        """Leert den Papierkorb endgültig und löscht Artikel auch in BAP/Grocy."""
         async with self._lock:
             count = len(self._trash)
             names = [t.get("name", "") for t in self._trash]
             self._trash = []
             self.save()
-        # BAP/Grocy cleanup (outside lock, may be slow)
+        # BAP/Grocy cleanup (außerhalb des Locks wegen möglicher Langsamkeit)
         if bap_client:
             target_name = config.get("bap_list_name", "Einkaufsliste").lower()
             try:
@@ -603,6 +658,7 @@ class ShoppingSync:
         return f"✅ {count} Artikel endgültig gelöscht."
 
     async def mark_purchased(self, name: str) -> str:
+        """Markiert einen Artikel in der zentralen Liste als gekauft."""
         async with self._lock:
             item = self._find(name)
             if not item:
@@ -613,6 +669,7 @@ class ShoppingSync:
         return f"✅ '{name}' als gekauft markiert."
 
     def propagate_mark_purchased(self, name: str):
+        """Propagiert die Kauf-Markierung an BAP und/oder Grocy."""
         bap_client = getattr(self, '_linked_bap', None)
         grocy_client = getattr(self, '_linked_grocy', None)
         if bap_client:
@@ -637,6 +694,7 @@ class ShoppingSync:
                 logger.debug(f"Grocy propagate_mark_purchased: {e}")
 
     async def update_quantity(self, name: str, quantity: int) -> str:
+        """Aktualisiert die Menge eines Artikels in der zentralen Liste."""
         async with self._lock:
             item = self._find(name)
             if item:
@@ -646,6 +704,7 @@ class ShoppingSync:
             return f"❌ '{name}' nicht gefunden."
 
     async def clear_purchased(self) -> str:
+        """Entfernt alle als gekauft markierten Artikel aus der zentralen Liste."""
         async with self._lock:
             before = len(self._synced_items)
             self._synced_items = [i for i in self._synced_items if not i.get("purchased")]
@@ -654,6 +713,7 @@ class ShoppingSync:
             return f"✅ {removed} gekaufte Artikel entfernt."
 
     async def batch_mark_purchased(self, names: list) -> str:
+        """Markiert mehrere Artikel gleichzeitig als gekauft."""
         marked = 0
         for name in names:
             r = await self.mark_purchased(name)
@@ -662,6 +722,7 @@ class ShoppingSync:
         return f"✅ {marked}/{len(names)} Artikel als gekauft markiert."
 
     async def batch_remove(self, names: list) -> str:
+        """Verschiebt mehrere Artikel gleichzeitig in den Papierkorb."""
         removed = 0
         for name in names:
             r = await self.remove_item(name)
@@ -670,6 +731,7 @@ class ShoppingSync:
         return f"✅ {removed}/{len(names)} Artikel in den Papierkorb verschoben."
 
     def get_merged_text(self) -> str:
+        """Gibt die aktive Einkaufsliste als formatierten Text zurück."""
         active = [i for i in self._synced_items if not i.get("purchased") and not self._is_removed(i.get("name", ""))]
         if not active:
             return "🛒 Einkaufsliste ist leer."
@@ -680,12 +742,14 @@ class ShoppingSync:
         return "\n".join(lines)
 
     def export_for_buymeapie(self) -> str:
+        """Exportiert die aktive Liste als Text für Buy Me a Pie."""
         active = [i for i in self._synced_items if not i.get("purchased") and not self._is_removed(i.get("name", ""))]
         return "\n".join(f"{i['name']}" if i.get('quantity', 1) == 1 else f"{i['name']} x{i['quantity']}" for i in active)
 
     # ─── API: BAP Sync ─────────────────────────────────────────
 
     def push_to_buymeapie(self, bap_client) -> str:
+        """Schiebt alle aktiven Artikel aus der Zentralliste zu Buy Me a Pie."""
         target_name = config.get("bap_list_name", "Einkaufsliste").lower()
         target_list_id = None
         for lst in bap_client.get_lists():
@@ -694,6 +758,7 @@ class ShoppingSync:
                 break
         if not target_list_id:
             return "❌ Keine passende BAP-Liste gefunden"
+        # Bereits existierende BAP-Artikel merken, um Duplikate zu vermeiden
         existing_bap = set()
         for item in bap_client.get_active_items(target_list_id):
             existing_bap.add(self._norm(item.get("title", "")))
@@ -712,6 +777,7 @@ class ShoppingSync:
         return f"📤 {added} Artikel zu BAP gepusht."
 
     def pull_purchased_from_bap(self, bap_client, grocy_client=None) -> str:
+        """Holt gekaufte Markierungen aus BAP ab und aktualisiert Zentralliste + Grocy."""
         target_name = config.get("bap_list_name", "Einkaufsliste").lower()
         marked = 0
         for lst in bap_client.get_lists():
@@ -739,6 +805,7 @@ class ShoppingSync:
         return f"📥 {marked} Artikel als gekauft markiert."
 
     def push_to_grocy(self, grocy_client) -> str:
+        """Schiebt alle aktiven Artikel aus der Zentralliste zu Grocy."""
         added = 0
         for item in self._synced_items:
             if item.get("purchased") or self._is_removed(item.get("name", "")):

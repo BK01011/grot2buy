@@ -11,38 +11,45 @@ class GrocyClient:
     """Grocy API Client — Einkaufsliste + Bestand."""
 
     def __init__(self, base_url: str, api_key: str):
+        """Initialisiert den Client mit Basis-URL und API-Key."""
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self._headers = {"GROCY-API-KEY": api_key}
         self._client = httpx.Client(timeout=10)
 
     def close(self):
+        """Schließt die HTTP-Sitzung."""
         try:
             self._client.close()
         except Exception as e:
             logger.debug(f"GrocyClient close: {e}")
 
     def _get(self, endpoint: str):
+        """Führt einen GET-Request gegen die Grocy-API aus."""
         resp = self._client.get(f"{self.base_url}/api/{endpoint}", headers=self._headers)
         resp.raise_for_status()
         return resp.json()
 
     def _post(self, endpoint: str, data: dict):
+        """Führt einen POST-Request gegen die Grocy-API aus."""
         resp = self._client.post(f"{self.base_url}/api/{endpoint}", headers=self._headers, json=data)
         resp.raise_for_status()
         return resp.json() if resp.text else {}
 
     def _delete(self, endpoint: str) -> bool:
+        """Führt einen DELETE-Request gegen die Grocy-API aus."""
         resp = self._client.delete(f"{self.base_url}/api/{endpoint}", headers=self._headers)
         return resp.status_code in (200, 204)
 
     def _put(self, endpoint: str, data: dict):
+        """Führt einen PUT-Request gegen die Grocy-API aus."""
         resp = self._client.put(f"{self.base_url}/api/{endpoint}",
                                 headers={**self._headers, "Content-Type": "application/json"}, json=data)
         resp.raise_for_status()
         return resp.json() if resp.text else {}
 
     def _get_main_list_id(self) -> int:
+        """Ermittelt die ID der ersten Einkaufsliste – Fallback auf 1."""
         try:
             lists = self._get("objects/shopping_lists")
             if isinstance(lists, list) and lists:
@@ -52,6 +59,7 @@ class GrocyClient:
         return 1
 
     def get_shopping_list(self, list_id: Optional[int] = None, include_done: bool = False) -> list:
+        """Holt die Einkaufsliste von Grocy, optional mit erledigten Artikeln und Produktdetails."""
         try:
             if list_id is None:
                 list_id = self._get_main_list_id()
@@ -62,6 +70,7 @@ class GrocyClient:
             if not include_done:
                 filtered = [i for i in filtered if i.get("done", 0) == 0]
 
+            # Produktnamen zu den Artikeln anreichern
             products = {}
             try:
                 all_products = self._get("objects/products")
@@ -81,7 +90,7 @@ class GrocyClient:
             return []
 
     def get_stock(self) -> dict[str, float]:
-        """Returns dict of {product_name_lower: stock_amount}."""
+        """Gibt Lagerbestand als {produktname_klein: menge} zurück."""
         try:
             stock_entries = self._get("stock")
             if not isinstance(stock_entries, list):
@@ -103,6 +112,7 @@ class GrocyClient:
             return {}
 
     def add_to_shopping_list(self, product_name: str, amount: int = 1, list_id: Optional[int] = None) -> str:
+        """Fügt einen Artikel zur Grocy-Einkaufsliste hinzu. Legt das Produkt an falls nötig."""
         try:
             if list_id is None:
                 list_id = self._get_main_list_id()
@@ -110,6 +120,7 @@ class GrocyClient:
             product = next((p for p in products if p.get("name", "").lower() == product_name.lower()), None)
 
             if not product:
+                # Produkt existiert nicht → neu anlegen mit Default-Einheit und -Ort
                 locations = self._get("objects/locations")
                 loc_id = locations[0]["id"] if locations else 1
                 qu = self._get("objects/quantity_units")
@@ -131,6 +142,7 @@ class GrocyClient:
             return f"❌ Grocy: {e}"
 
     def remove_from_shopping_list(self, item_id: int) -> bool:
+        """Entfernt einen Artikel aus der Grocy-Einkaufsliste."""
         try:
             self._delete(f"objects/shopping_list/{item_id}")
             return True
@@ -138,6 +150,7 @@ class GrocyClient:
             return False
 
     def mark_done(self, item_id: int) -> bool:
+        """Markiert einen Grocy-Artikel als erledigt (done=1)."""
         try:
             resp = self._client.put(f"{self.base_url}/api/objects/shopping_list/{item_id}",
                 headers={**self._headers, "Content-Type": "application/json"},
@@ -147,6 +160,7 @@ class GrocyClient:
             return False
 
     def revert_done(self, item_id: int) -> bool:
+        """Macht die Erledigt-Markierung eines Grocy-Artikels rückgängig (done=0)."""
         try:
             resp = self._client.put(f"{self.base_url}/api/objects/shopping_list/{item_id}",
                 headers={**self._headers, "Content-Type": "application/json"},
@@ -156,6 +170,7 @@ class GrocyClient:
             return False
 
     def update_shopping_list_item(self, item_id: int, amount: int) -> bool:
+        """Aktualisiert die Menge eines Artikels in der Grocy-Einkaufsliste."""
         try:
             self._put(f"objects/shopping_list/{item_id}", {"amount": amount})
             return True
@@ -168,15 +183,17 @@ class ShoppingManager:
     """Einheitlicher Manager: Grocy, Buy Me a Pie oder Lokal."""
 
     def __init__(self):
+        """Initialisiert den Manager ohne aktive Backend-Verbindung."""
         self._grocy: Optional[GrocyClient] = None
         self._bap: Optional[BuyMeAPieClient] = None
 
     def configure_grocy(self, base_url: str, api_key: str) -> bool:
+        """Verbindet sich mit einem Grocy-Server und prüft die Verbindung."""
         try:
             if self._grocy:
                 self._grocy.close()
             client = GrocyClient(base_url, api_key)
-            client.get_shopping_list()
+            client.get_shopping_list()  # Verbindung testen
             self._grocy = client
             return True
         except Exception as e:
@@ -185,6 +202,7 @@ class ShoppingManager:
             return False
 
     def configure_buymeapie(self, username: str, password: str) -> bool:
+        """Verbindet sich mit Buy Me a Pie und prüft den Login."""
         try:
             self._bap = create_client(username, password)
             return self._bap is not None

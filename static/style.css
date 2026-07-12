@@ -1,3 +1,4 @@
+/* ─── Farben, Schatten und Grundabstände ─────────────── */
 :root {
     --primary: #06b6d4;
     --primary-light: #22d3ee;
@@ -19,8 +20,10 @@
     --radius-sm: 8px;
 }
 
+/* Globales Reset: Ränder, Abstände und Box-Modell zurücksetzen */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+/* Hintergrund, Schrift und Grunddarstellung */
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: var(--bg);
@@ -29,6 +32,7 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
+/* App-Container: zentriert, füllt den ganzen Bildschirm */
 .app {
     max-width: 600px;
     margin: 0 auto;
@@ -49,18 +53,21 @@ body {
     z-index: 100;
 }
 
+/* Zeile im Header: Logo links, Buttons rechts */
 .header-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
 }
 
+/* Linke Seite: Logo + Titel */
 .header-left {
     display: flex;
     align-items: center;
     gap: 12px;
 }
 
+/* App-Logo im Header */
 .header-logo {
     width: 43px;
     height: 43px;
@@ -68,11 +75,13 @@ body {
     flex-shrink: 0;
 }
 
+/* App-Titel */
 .header h1 {
     font-size: 1rem;
     font-weight: 700;
 }
 
+/* FAB für Artikelanzahl: unten links, springt beim Klick nach oben */
 .item-count-fab {
     position: fixed;
     bottom: 24px;
@@ -100,11 +109,13 @@ body {
     height: 18px;
 }
 
+/* Rechte Seite im Header: Aktions-Buttons */
 .header-right {
     display: flex;
     gap: 4px;
 }
 
+/* Icon-Button (Sync, Trash, DarkMode, Hilfe, Einstellungen) */
 .btn-icon {
     background: none;
     border: none;
@@ -120,10 +131,12 @@ body {
     color: var(--text);
 }
 
+/* Sync-Button während Synchronisation: Icon dreht sich */
 .btn-icon.syncing svg {
     animation: spin 1s linear infinite;
 }
 
+/* Aktiver Icon-Button (z. B. Batch-Modus aktiv) */
 .btn-icon.active {
     background: var(--primary);
     color: #fff;
@@ -244,6 +257,7 @@ body {
     display: none;
 }
 
+/* Ladeanzeige: zentriert mit Spinner */
 .loading {
     display: flex;
     flex-direction: column;
@@ -253,6 +267,7 @@ body {
     color: var(--text-secondary);
 }
 
+/* Spinner-Container: horizontale Punktreihe */
 .spinner {
     position: relative;
     width: 48px;
@@ -263,6 +278,7 @@ body {
     gap: 6px;
 }
 
+/* Einzelner Spinner-Punkt mit wellenförmiger Animation */
 .spinner-dot {
     width: 10px;
     height: 10px;
@@ -271,6 +287,7 @@ body {
     animation: kRider 1.2s ease-in-out infinite;
 }
 
+/* Gestaffelte Startzeiten für jeden Punkt */
 .spinner-dot:nth-child(1) { animation-delay: 0s; }
 .spinner-dot:nth-child(2) { animation-delay: 0.1s; }
 .spinner-dot:nth-child(3) { animation-delay: 0.2s; }
@@ -279,6 +296,7 @@ body {
 .spinner-dot:nth-child(6) { animation-delay: 0.5s; }
 .spinner-dot:nth-child(7) { animation-delay: 0.6s; }
 
+/* Wellen-Animation: von unsichtbar/klein zu sichtbar/groß und zurück */
 @keyframes kRider {
     0%, 100% { opacity: 0.25; transform: scale(0.5); }
     15% { opacity: 1; transform: scale(1.2); }
@@ -287,11 +305,12 @@ body {
 
 
 
-/* Category */
+/* ─── Kategorie-Gruppe ──────────────────────────────────────── */
 .category {
     margin-bottom: 24px;
 }
 
+/* Kategorie-Überschrift mit Icon und Anzahl */
 .category-header {
     display: flex;
     align-items: center;
@@ -304,6 +323,7 @@ body {
     letter-spacing: 0.05em;
 }
 
+/* Anzahl der Artikel in dieser Kategorie */
 .category-count {
     background: var(--surface-alt);
     padding: 2px 8px;
@@ -311,7 +331,7 @@ body {
     font-size: 0.75rem;
 }
 
-/* Items */
+/* ─── Artikelliste ───────────────────────────────────── */
 .item-list {
     background: var(--surface);
     border-radius: var(--radius);
@@ -319,6 +339,7 @@ body {
     overflow: hidden;
 }
 
+/* Einzelner Artikel: Checkbox, Name, Menge, Löschen */
 .item {
     display: flex;
     align-items: center;
@@ -332,10 +353,12 @@ body {
 
 .item:hover { background: var(--surface-alt); }
 
+/* Gekaufter Artikel: halbtransparent */
 .item.purchased {
     opacity: 0.5;
 }
 
+/* Runde Checkbox zum Markieren als gekauft */
 .item-check {
     width: 24px;
     height: 24px;
@@ -354,11 +377,13 @@ body {
     background: #dcfce7;
 }
 
+/* Checkbox: angekreuzt (gekauft) */
 .item-check.checked {
     background: var(--success);
     border-color: var(--success);
 }
 
+/* Haken-Icon in der Checkbox */
 .item-check.checked::after {
     content: '✓';
     color: white;
@@ -366,30 +391,36 @@ body {
     font-weight: bold;
 }
 
+/* Artikel-Bereich: Name und Metadaten */
 .item-info {
     flex: 1;
     min-width: 0;
 }
 
+/* Artikel-Name */
 .item-name {
     font-weight: 500;
     word-break: break-word;
 }
 
+/* Durchgestrichen bei gekauften Artikeln */
 .item.purchased .item-name {
     text-decoration: line-through;
 }
 
+/* Meta-Info (z. B. Quelle, Notizen) */
 .item-meta {
     font-size: 0.75rem;
     color: var(--text-secondary);
     margin-top: 2px;
 }
 
+/* Kategorie-Gruppe innerhalb der Listenansicht */
 .category-group {
     margin-bottom: 4px;
 }
 
+/* Kategorie-Überschrift im Grouped-Modus */
 .category-header {
     padding: 12px 16px 6px;
     font-size: 0.8rem;
@@ -399,6 +430,7 @@ body {
     letter-spacing: 0.05em;
 }
 
+/* Artikelanzahl hinter der Kategorie */
 .category-count {
     font-weight: 400;
     color: var(--text-muted);
@@ -406,6 +438,7 @@ body {
     margin-left: 6px;
 }
 
+/* ─── Mengensteuerung ────────────────────────────────────────── */
 .item-quantity {
     display: flex;
     align-items: center;
@@ -413,6 +446,7 @@ body {
     flex-shrink: 0;
 }
 
+/* Plus/Minus-Buttons für die Menge */
 .qty-btn {
     width: 28px;
     height: 28px;
@@ -432,12 +466,14 @@ body {
     border-color: var(--secondary);
 }
 
+/* Angezeigter Mengenwert */
 .qty-value {
     min-width: 32px;
     text-align: center;
     font-weight: 600;
 }
 
+/* Lösch-Button für einen Artikel */
 .item-delete {
     width: 32px;
     height: 32px;
@@ -505,7 +541,7 @@ body {
     box-shadow: 0 12px 28px rgba(6,182,212,0.25);
 }
 
-/* Modal */
+/* ─── Modal (Bottom-Sheet) ──────────────────────────────────── */
 .modal {
     display: none;
     position: fixed;
@@ -520,6 +556,7 @@ body {
     display: flex;
 }
 
+/* Modal-Inhalt: von unten hereinschiebend */
 .modal-content {
     background: var(--surface);
     border-radius: 20px 20px 0 0;
@@ -531,11 +568,13 @@ body {
     box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
 }
 
+/* Slide-Up-Animation für Bottom-Sheets */
 @keyframes slideUp {
     from { transform: translateY(100%); }
     to { transform: translateY(0); }
 }
 
+/* Modal-Kopfzeile: Titel + Schließen-Button */
 .modal-header {
     display: flex;
     align-items: center;
@@ -551,6 +590,7 @@ body {
     font-size: 1.125rem;
 }
 
+/* Runder Schließen-Button im Modal */
 .btn-close {
     width: 32px;
     height: 32px;
@@ -564,19 +604,23 @@ body {
     justify-content: center;
 }
 
+/* Modal-Inhalt (scrollbar) */
 .modal-body {
     padding: 20px;
 }
 
+/* Dokumentations-Modal: etwas kleiner */
 .docs-modal {
     max-height: 85vh;
 }
 
+/* ─── Dokumentation / Markdown-Inhalte ──────────────────────── */
 .docs-body {
     font-size: 0.85rem;
     line-height: 1.6;
 }
 
+/* ─── Log-Viewer ────────────────────────────────────────────── */
 .log-viewer {
     font-size: 0.72rem;
     line-height: 1.5;
@@ -592,6 +636,7 @@ body {
     border: 1px solid var(--border);
 }
 
+/* Log-Level-Farben */
 .log-time {
     color: var(--text-secondary);
 }
@@ -615,6 +660,7 @@ body {
     color: var(--secondary);
 }
 
+/* Docs-Überschriften */
 .docs-body h1 {
     font-size: 1.2rem;
     margin: 0 0 12px;
@@ -633,11 +679,13 @@ body {
     color: var(--text);
 }
 
+/* Docs-Absätze */
 .docs-body p {
     margin: 6px 0;
     color: var(--text-secondary);
 }
 
+/* Docs-Listen */
 .docs-body ul, .docs-body ol {
     margin: 6px 0;
     padding-left: 20px;
@@ -648,12 +696,14 @@ body {
     color: var(--text-secondary);
 }
 
+/* Trennlinie in Docs */
 .docs-body hr {
     border: none;
     border-top: 1px solid var(--border);
     margin: 16px 0;
 }
 
+/* Code-Blöcke in Docs */
 .docs-body pre {
     background: var(--surface-alt);
     border-radius: 8px;
@@ -670,6 +720,7 @@ body {
     font-size: 0.78rem;
 }
 
+/* Modal-Fußzeile mit Aktions-Buttons */
 .modal-footer {
     display: flex;
     gap: 12px;
@@ -677,7 +728,7 @@ body {
     border-top: 1px solid var(--border);
 }
 
-/* Inputs */
+/* ─── Eingabefelder ─────────────────────────────────────────── */
 .input-group {
     margin-bottom: 16px;
 }
@@ -690,6 +741,7 @@ body {
     color: var(--text-secondary);
 }
 
+/* Textfeld und Dropdown */
 .input-group input,
 .input-group select {
     width: 100%;
@@ -708,6 +760,7 @@ body {
     box-shadow: 0 0 0 3px rgba(6,182,212,0.15);
 }
 
+/* Horizontale Reihe mit zwei Eingabegruppen */
 .input-row {
     display: flex;
     gap: 12px;
@@ -717,6 +770,7 @@ body {
     flex: 1;
 }
 
+/* ─── Mengensteuerung (— / + ) ─────────────────────────────── */
 .quantity-control {
     display: flex;
     align-items: center;
@@ -750,7 +804,7 @@ body {
     width: 100%;
 }
 
-/* Buttons */
+/* ─── Buttons ───────────────────────────────────────────────── */
 .btn {
     padding: 12px 24px;
     border: none;
@@ -767,6 +821,7 @@ body {
     border-radius: var(--radius-sm);
 }
 
+/* Toggle-Button für Batch-Auswahl */
 .select-toggle {
     background: none;
     border: 1px solid var(--border);
@@ -777,6 +832,7 @@ body {
     color: var(--text);
 }
 
+/* Primärer Aktions-Button (türkis) */
 .btn-primary {
     background: var(--primary);
     color: white;
@@ -786,6 +842,7 @@ body {
 
 .btn-primary:hover { background: var(--primary-dark); box-shadow: 0 4px 12px rgba(6,182,212,0.3); transform: translateY(-1px); }
 
+/* Sekundärer Button (hellgrau) */
 .btn-secondary {
     background: var(--surface-alt);
     color: var(--text);
@@ -793,6 +850,7 @@ body {
 
 .btn-secondary:hover { background: var(--border); }
 
+/* Gefahren-Button (rot) */
 .btn-danger {
     background: var(--danger);
     color: white;
@@ -801,12 +859,14 @@ body {
 
 .btn-danger:hover { background: #dc2626; box-shadow: 0 4px 12px rgba(239,68,68,0.3); transform: translateY(-1px); }
 
+/* Volle Breite */
 .btn.full-width {
     width: 100%;
     margin-bottom: 8px;
 }
 
 
+/* ─── Toast-Benachrichtigung ─────────────────────────────────── */
 .toast {
     position: fixed;
     bottom: 100px;
@@ -829,6 +889,7 @@ body {
 
 .toast.show { opacity: 1; }
 
+/* Container für mehrere Toasts (z. B. Undo-Toast) */
 .toast-container {
     position: fixed;
     bottom: 100px;
@@ -842,6 +903,7 @@ body {
     pointer-events: none;
 }
 
+/* ─── Undo-Toast (mit Rückgängig-Button) ────────────────────── */
 .undo-toast {
     background: var(--text);
     color: white;
@@ -860,6 +922,7 @@ body {
 
 .undo-toast.show { opacity: 1; }
 
+/* Rückgängig-Button im Undo-Toast */
 .undo-toast-btn {
     background: transparent;
     border: 1px solid rgba(255,255,255,0.5);
@@ -876,6 +939,7 @@ body {
     background: rgba(255,255,255,0.15);
 }
 
+/* Gelöschter Artikel im Papierkorb */
 .trashed-item .item-info {
     flex: 1;
 }
@@ -884,6 +948,7 @@ body {
     flex-shrink: 0;
 }
 
+/* ─── Offline-Badge ──────────────────────────────────────────── */
 .offline-badge {
     position: fixed;
     top: 0;
@@ -904,7 +969,7 @@ body {
     transform: translateY(0);
 }
 
-/* Settings */
+/* ─── Einstellungen ──────────────────────────────────────────── */
 .settings-section {
     margin-bottom: 24px;
 }
@@ -931,6 +996,7 @@ body {
     --shadow-lg: 0 10px 25px rgba(0,0,0,0.5);
 }
 
+/* Dark-Mode-Override für Eingabefelder */
 [data-theme="dark"] .input-group input,
 [data-theme="dark"] .input-group select,
 [data-theme="dark"] .quantity-control input {
@@ -950,30 +1016,36 @@ body {
     box-shadow: 0 0 0 3px rgba(6,182,212,0.25);
 }
 
+/* Dark-Mode-Override für Mengen-Buttons */
 [data-theme="dark"] .quantity-control button {
     background: #1e293b;
     color: #f1f5f9;
 }
 
+/* Dark-Mode-Hover für Checkbox */
 [data-theme="dark"] .item-check:hover {
     border-color: var(--success);
     background: #14532d;
 }
 
+/* Dark-Mode-Hover für Lösch-Button */
 [data-theme="dark"] .item-delete:hover {
     background: #450a0a;
     color: var(--danger);
 }
 
+/* Dark-Mode-Toast (doppelt definiert – zweite Definition überschreibt) */
 [data-theme="dark"] .toast {
     background: var(--surface-alt);
     color: var(--text);
 }
 
+/* Dark-Mode-Schatten für FAB-Hover */
 [data-theme="dark"] .fab:hover {
     box-shadow: 0 12px 28px rgba(6,182,212,0.4);
 }
 
+/* Dark-Mode-Schatten für primäre Buttons */
 [data-theme="dark"] .btn-primary {
     box-shadow: 0 2px 6px rgba(6,182,212,0.15);
 }
@@ -982,25 +1054,31 @@ body {
     box-shadow: 0 4px 12px rgba(6,182,212,0.25);
 }
 
+/* Dark-Mode-Schatten für Item-Count-FAB */
 [data-theme="dark"] .item-count-fab {
     box-shadow: 0 4px 14px rgba(139,92,246,0.45);
 }
 
+/* Dark-Mode-Schatten für aktiven Tab */
 [data-theme="dark"] .tab.active {
     box-shadow: 0 2px 8px rgba(6,182,212,0.2);
 }
 
+/* Dark-Mode-Schatten für Modal */
 [data-theme="dark"] .modal-content {
     box-shadow: 0 -4px 20px rgba(0,0,0,0.4);
 }
 
+/* Dark-Mode-Toast (zweite Definition mit Shadow) */
 [data-theme="dark"] .toast {
     background: var(--surface-alt);
     color: var(--text);
     box-shadow: 0 4px 16px rgba(0,0,0,0.4);
 }
 
-/* Batch Select Mode */
+/* ─── Batch-Auswahl-Modus ────────────────────────────────────── */
+
+/* Checkbox für Batch-Auswahl (unsichtbar im Normalmodus) */
 .item-select {
     width: 22px;
     height: 22px;
@@ -1016,14 +1094,17 @@ body {
     margin-right: 2px;
 }
 
+/* Im Select-Modus eingeblendet */
 .item-list.select-mode .item-select {
     display: flex;
 }
 
+/* Runde Checkbox im Select-Modus ausgeblendet */
 .item-list.select-mode .item-check {
     display: none;
 }
 
+/* Ausgewählte Checkbox */
 .item-select.selected {
     background: var(--primary);
     border-color: var(--primary);
@@ -1036,11 +1117,12 @@ body {
     font-weight: bold;
 }
 
+/* Markierter Artikel im Batch-Modus */
 .item.selected {
     background: color-mix(in srgb, var(--primary) 10%, transparent);
 }
 
-/* ─── Select Bar (inline in synced view) ──────────────── */
+/* ─── Select-Bar (Batch-Aktionsleiste) ────────────────── */
 
 .select-bar {
     display: flex;
@@ -1059,6 +1141,7 @@ body {
     text-align: center;
 }
 
+/* Dark Mode: Batch-Auswahl */
 [data-theme="dark"] .item.selected {
     background: color-mix(in srgb, var(--primary) 20%, transparent);
 }
@@ -1072,7 +1155,7 @@ body {
     border-color: #475569;
 }
 
-/* Help Modal */
+/* ─── Hilfe-Modal ────────────────────────────────────────────── */
 .help-body { padding-bottom: 32px; }
 
 .help-section { margin-bottom: 24px; }
@@ -1117,8 +1200,9 @@ body {
     font-size: 0.8rem;
 }
 
-/* Responsive */
+/* ─── Responsive Anpassungen ─────────────────────────────────── */
 @media (min-width: 601px) {
+    /* Auf größeren Bildschirmen: Modal abgerundet */
     .modal-content {
         border-radius: var(--radius);
         margin-bottom: 20px;

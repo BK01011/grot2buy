@@ -4,6 +4,26 @@ All changes to Grot2Buy with explanations.
 
 ---
 
+## [1.0.0] — 2026-07-12
+
+### 🎉 Meilenstein-Release — Erste stabile Version
+
+Nach 27 Beta-Versionen und Security-Audits über 5 Batches wird Grot2Buy 1.0.0 veröffentlicht.
+
+### Was wurde gemacht
+
+- **Komplett-Kommentierung** — Alle Python-, JavaScript-, CSS- und HTML-Dateien mit deutschen Docstrings und Inline-Kommentaren versehen
+- **Version** auf 1.0.0 hochgezogen
+- **Alle bestehenden Features** aus v0.27.0: Bidirektionaler Sync, WebSocket Live-Updates, Offline-Modus, Papierkorb, Batch-Aktionen, Mehrsprachigkeit, Log-Viewer
+- **Sicherheit**: 25 Findings aus 5 Security-Audit-Batches gefixt (XSS, CSWSH, SSRF, Credential-Leaks, Rate-Limiting, Token-Encryption)
+
+### Paket
+
+- Fertiges Release-Paket (`grot2buy-1.0.0.tar.gz` / `.zip`) unter GitHub Releases
+- Startbar über Docker (`docker compose up -d`) oder nativ (`python main.py`)
+
+---
+
 ## [0.27.0] — 2026-07-12
 
 ### 🔒 Security Audit Batch 2–5 (25 Findings) + v0.14 Fixes

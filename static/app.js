@@ -1,14 +1,16 @@
-// Grot2Buy — Frontend
+// Grot2Buy — Frontend (Single-Page-App)
 const API = '/api';
-let currentTab = 'synced';
-let categories = [];
-let selectMode = false;
-let selectedItems = new Set();
+let currentTab = 'synced';        // Aktiver Tab: 'synced' | 'grocy' | BAP-Listen-ID
+let categories = [];              // Gecachte Kategorien für das Auswahlfeld
+let selectMode = false;           // Batch-Modus aktiv?
+let selectedItems = new Set();    // Menge der markierten Artikelnamen
 
 // Übersetzungs-Hilfe (wird aus window._t gespeist, das im Template gesetzt wird)
+// Gibt den übersetzten String für `key` zurück, mit optionalen Platzhaltern {name}
 function __(key, ...args) {
     let msg = window._t?.[key];
     if (msg === undefined) return key;
+    // Platzhalter ersetzen: __('item.stock', {n: 5}) → "Bestand: 5"
     if (args.length === 1 && typeof args[0] === 'object' && args[0] !== null) {
         for (const [k, v] of Object.entries(args[0])) {
             msg = msg.split(`{${k}}`).join(v);
@@ -19,6 +21,7 @@ function __(key, ...args) {
 
 // ─── Dark Mode ────────────────────────────────────────────────
 
+// Wendet ein Theme auf das Dokument an: 'dark', 'light' oder 'auto' (Systemeinstellung)
 function applyTheme(theme) {
     if (theme === 'dark') {
         document.documentElement.setAttribute('data-theme', 'dark');
@@ -34,6 +37,7 @@ function applyTheme(theme) {
     }
 }
 
+// Schaltet zwischen dark/light/auto um und persistiert die Auswahl
 function toggleDarkMode(theme) {
     if (!theme) {
         const current = localStorage.getItem('grot2buy_theme') || 'auto';
@@ -54,6 +58,7 @@ function toggleDarkMode(theme) {
     if (sel) sel.value = theme;
 }
 
+// Aktualisiert das Icon im Dark-Mode-Button (Mond für dark, Sonne für light/auto)
 function updateDarkModeBtn() {
     const btn = document.getElementById('darkModeBtn');
     if (!btn) return;
@@ -69,6 +74,7 @@ function updateDarkModeBtn() {
 
 // ─── Push Notifications ───────────────────────────────────────
 
+// Fragt die Browser-Berechtigung für Desktop-Benachrichtigungen an (einmalig)
 async function requestNotificationPermission() {
     if (!('Notification' in window) || !navigator.serviceWorker?.controller) return;
     if (Notification.permission === 'default') {
@@ -76,6 +82,7 @@ async function requestNotificationPermission() {
     }
 }
 
+// Sendet eine Push-Notification über den Service Worker (auch im Hintergrund)
 async function sendNotification(title, body) {
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
     if (navigator.serviceWorker?.controller) {
@@ -85,10 +92,11 @@ async function sendNotification(title, body) {
 
 // ─── WebSocket ───────────────────────────────────────────────
 
-let ws = null;
-let wsReconnectAttempts = 0;
-const WS_MAX_RECONNECT = 20;
+let ws = null;                   // WebSocket-Instanz für Live-Updates
+let wsReconnectAttempts = 0;     // Zähler für exponentielle Wiederanlauf-Verzögerung
+const WS_MAX_RECONNECT = 20;     // Maximale Anzahl Wiederanlauf-Versuche
 
+// Baut eine WebSocket-Verbindung zum Server auf (Live-Sync, Push-Benachrichtigungen)
 function connectWebSocket() {
     if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -97,6 +105,7 @@ function connectWebSocket() {
     ws.onopen = () => {
         const wasReconnect = wsReconnectAttempts > 0;
         wsReconnectAttempts = 0;
+        // Nach Wiederanlauf oder initialem Verbindungsaufbau Daten neu laden
         if (wasReconnect || !lastSyncOk) {
             loadItems();
             loadLists();
@@ -107,14 +116,14 @@ function connectWebSocket() {
         try {
             const msg = JSON.parse(event.data);
             switch (msg.type) {
-                case 'sync_complete':
+                case 'sync_complete':           // Sync am Server fertig → Status + Reload
                     lastSyncTime = msg.timestamp;
                     localStorage.setItem('grot2buy_last_sync', msg.timestamp);
                     updateSyncStatus(true, formatTime(msg.timestamp));
                     loadItems();
                     loadLists();
                     break;
-                case 'items_updated':
+                case 'items_updated':           // CRUD-Operation → Reload
                     loadItems();
                     loadLists();
                     break;
@@ -126,6 +135,7 @@ function connectWebSocket() {
 
     ws.onclose = () => {
         ws = null;
+        // Exponentielles Backoff: 1s, 2s, 4s, … max 10s
         if (wsReconnectAttempts < WS_MAX_RECONNECT) {
             wsReconnectAttempts++;
             setTimeout(connectWebSocket, Math.min(1000 * wsReconnectAttempts, 10000));
@@ -139,6 +149,7 @@ function connectWebSocket() {
 
 // ─── Visibility ──────────────────────────────────────────────
 
+// Beim Zurückkehren zum Tab: WebSocket prüfen und Daten aktualisieren
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
         if (!ws || ws.readyState !== WebSocket.OPEN) {
@@ -169,22 +180,25 @@ if ('serviceWorker' in navigator) {
     });
 }
 
-let lastSyncOk = false;
-let lastSyncTime = null;
-let syncTimer = null;
+let lastSyncOk = false;     // War der letzte Sync erfolgreich?
+let lastSyncTime = null;     // ISO-Timestamp des letzten erfolgreichen Syncs
+let syncTimer = null;        // Timer-Referenz für die Sync-Pill-Aktualisierung
 
+// Startet einen Timer, der regelmäßig die relative Sync-Zeit aktualisiert
 function startSyncTimer(intervalMin) {
     if (syncTimer) clearInterval(syncTimer);
     const ms = (intervalMin > 0 ? intervalMin : 2) * 60 * 1000;
     syncTimer = setInterval(refreshPillTime, ms);
 }
 
+// Aktualisiert den angezeigten Text in der Sync-Pill
 function refreshPillTime() {
     if (!lastSyncTime) return;
     const text = document.getElementById('pillText');
     if (text) text.textContent = formatTime(lastSyncTime);
 }
 
+// Setzt Status und Text der Sync-Pill (grün = ok, rot = Fehler)
 function updateSyncStatus(ok, timeStr) {
     const pill = document.getElementById('syncStatus');
     const text = document.getElementById('pillText');
@@ -199,6 +213,7 @@ function updateSyncStatus(ok, timeStr) {
     }
 }
 
+// Formatiert einen ISO-Timestamp als relative Zeitangabe (z. B. "5m", "2h")
 function formatTime(iso) {
     if (!iso) return '';
     const now = Date.now();
@@ -210,25 +225,28 @@ function formatTime(iso) {
     return Math.floor(diff / 86400) + 'd';
 }
 
+// Haupt-Initialisierung beim Laden der Seite
 document.addEventListener('DOMContentLoaded', async () => {
     applyTheme(localStorage.getItem('grot2buy_theme') || 'auto');
     updateDarkModeBtn();
     requestNotificationPermission();
     connectWebSocket();
 
+    // Letzte Sync-Zeit aus dem localStorage wiederherstellen
     const lastSync = localStorage.getItem('grot2buy_last_sync');
     if (lastSync) {
         updateSyncStatus(true, formatTime(lastSync));
     }
     startSyncTimer(2);
 
-    // Data first, sync im Hintergrund
+    // Daten zuerst laden, dann Sync im Hintergrund
     await Promise.all([
         loadCategories(),
         loadLists(),
         loadItems(),
     ]);
 
+    // Vollständiger bidirektionaler Sync beim Start
     api('/sync/full').then(result => {
         const now = new Date().toISOString();
         localStorage.setItem('grot2buy_last_sync', now);
@@ -248,14 +266,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // ─── Pull to Refresh ─────────────────────────────────────────
 
+// Touch-Geste: nach unten wischen löst Sync aus (wie bei nativen Apps)
 (function() {
-    let startY = 0;
-    let pulling = false;
-    const threshold = 100;
+    let startY = 0;          // Y-Position bei Touch-Beginn
+    let pulling = false;     // Wird gezogen?
+    const threshold = 100;   // Mindest-Distanz in px für Auslösung
     const app = document.querySelector('.app');
 
     app.addEventListener('touchstart', (e) => {
-        if (window.scrollY > 0) return;
+        if (window.scrollY > 0) return;  // Nicht auslösen, wenn gescrollt
         startY = e.touches[0].clientY;
         pulling = true;
     }, { passive: true });
@@ -264,7 +283,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!pulling) return;
         const dy = e.touches[0].clientY - startY;
         if (dy > 20) {
-            e.preventDefault();
+            e.preventDefault();  // Bounce verhindern
         }
     }, { passive: false });
 
@@ -273,7 +292,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         pulling = false;
         const dy = e.changedTouches[0].clientY - startY;
         if (dy > threshold) {
-            syncWithBAP();
+            syncWithBAP();  // Sync auslösen
         }
     }, { passive: true });
 })();
@@ -282,11 +301,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // ─── Offline Support ────────────────────────────────────────
 
+// Liest die Offline-Warteschlange aus localStorage (Liste ausstehender API-Requests)
 function getOfflineQueue() {
     try { return JSON.parse(localStorage.getItem('grot2buy_offline_queue') || '[]'); }
     catch { return []; }
 }
 
+// Fügt einen Request zur Offline-Warteschlange hinzu (wird bei Online nachgeholt)
 function addToOfflineQueue(path, opts) {
     const queue = getOfflineQueue();
     queue.push({ path, method: opts?.method || 'GET', body: opts?.body ? JSON.parse(opts.body) : null, timestamp: Date.now() });
@@ -294,6 +315,7 @@ function addToOfflineQueue(path, opts) {
     updateOfflineBadge();
 }
 
+// Verarbeitet die gespeicherte Warteschlange, sobald das Netzwerk wieder verfügbar ist
 async function processOfflineQueue() {
     const queue = getOfflineQueue();
     if (queue.length === 0) return;
@@ -307,6 +329,7 @@ async function processOfflineQueue() {
                 body: op.body ? JSON.stringify(op.body) : undefined,
             });
         } catch {
+            // Fehlgeschlagenen Eintrag zurück in die Queue legen und abbrechen
             addToOfflineQueue(op.path, { method: op.method, body: op.body ? JSON.stringify(op.body) : undefined });
             break;
         }
@@ -314,6 +337,7 @@ async function processOfflineQueue() {
     loadItems();
 }
 
+// Zeigt das Offline-Badge an: 📴 offline, ⏳ ausstehende Queue
 function updateOfflineBadge() {
     const badge = document.getElementById('offlineBadge');
     const queue = getOfflineQueue();
@@ -334,9 +358,13 @@ window.addEventListener('offline', updateOfflineBadge);
 
 // ─── API ────────────────────────────────────────────────────
 
+// Allgemeiner API-Helfer: Führt einen Request aus, bei Fehlern mit Offline-Fallback
+// Parameter: path – API-Pfad, opts – fetch-Optionen (method, body, …)
+// Gibt das JSON-Response-Objekt zurück oder wirft einen Fehler
 async function api(path, opts = {}) {
     const isMutation = opts.method && opts.method !== 'GET';
     try {
+        // Cache-Buster bei GETs, um veraltete Daten zu vermeiden
         const url = isMutation ? `${API}${path}` : `${API}${path}${path.includes('?') ? '&' : '?'}_t=${Date.now()}`;
         const res = await fetch(url, {
             headers: { 'Content-Type': 'application/json' },
@@ -350,6 +378,7 @@ async function api(path, opts = {}) {
         }
         return await res.json();
     } catch (e) {
+        // Schreib-Operationen bei Netzwerk-/Server-Fehlern in die Offline-Queue umleiten
         if (isMutation && (e.name === 'TypeError' || (e.status && e.status >= 500))) {
             addToOfflineQueue(path, opts);
             return { result: __('offline.queued'), offline: true };
@@ -358,6 +387,7 @@ async function api(path, opts = {}) {
     }
 }
 
+// Zeigt eine Kurzzeit-Benachrichtigung (Toast) am unteren Bildschirmrand an
 function toast(msg, duration = 3000) {
     const el = document.getElementById('toast');
     el.textContent = msg;
@@ -365,6 +395,8 @@ function toast(msg, duration = 3000) {
     setTimeout(() => el.classList.remove('show'), duration);
 }
 
+// Zeigt einen Toast mit "Rückgängig"-Button (für Lösch-Operationen)
+// undoAction: Callback, der beim Klick auf "Rückgängig" ausgeführt wird
 function undoToast(msg, undoAction, duration = 5000) {
     const container = document.getElementById('toastContainer');
     const el = document.createElement('div');
@@ -383,6 +415,7 @@ function undoToast(msg, undoAction, duration = 5000) {
     setTimeout(cleanup, duration);
 }
 
+// Lädt eine Datei vom Server und löst den Download im Browser aus
 async function downloadFile(url, filename) {
     try {
         const res = await fetch(url);
@@ -403,6 +436,7 @@ async function downloadFile(url, filename) {
 
 // ─── Categories ──────────────────────────────────────────────
 
+// Lädt verfügbare Kategorien vom Server und befüllt das Auswahlfeld
 async function loadCategories() {
     try {
         const data = await api('/categories');
@@ -417,6 +451,7 @@ async function loadCategories() {
 
 // ─── Lists (Tabs) ───────────────────────────────────────────
 
+// Lädt alle verknüpften BAP-Listen und baut die Tab-Leiste (Synced, Grocy, BAP-Listen)
 async function loadLists() {
     try {
         const data = await api('/lists');
@@ -435,6 +470,7 @@ async function loadLists() {
     }
 }
 
+// Klick auf einen Tab wechselt die Ansicht
 document.addEventListener('click', function(e) {
     const tab = e.target.closest('.tab');
     if (tab && tab.dataset.list) {
@@ -442,16 +478,18 @@ document.addEventListener('click', function(e) {
     }
 });
 
+// Wechselt zwischen Synced/Grocy/BAP-Tab und lädt die passenden Daten
 function switchTab(tab, btn) {
     currentTab = tab;
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     btn.classList.add('active');
-    if (selectMode) toggleSelectMode();
+    if (selectMode) toggleSelectMode();  // Batch-Modus beim Tab-Wechsel beenden
     loadItems();
 }
 
 // ─── Items ───────────────────────────────────────────────────
 
+// Lädt Artikel für den aktiven Tab und rendert sie (synced, grocy oder BAP-Liste)
 async function loadItems() {
     const content = document.getElementById('content');
     content.innerHTML = '<div class="loading"><div class="spinner"><div class="spinner-dot"></div><div class="spinner-dot"></div><div class="spinner-dot"></div><div class="spinner-dot"></div><div class="spinner-dot"></div><div class="spinner-dot"></div><div class="spinner-dot"></div></div><p>' + __('loading.data') + '</p></div>';
@@ -474,6 +512,7 @@ async function loadItems() {
     }
 }
 
+// Fallback: Versucht, die synced-Items aus einem Service-Worker-Cache zu laden (Offline)
 async function showOfflineFallback() {
     const content = document.getElementById('content');
     const cacheNames = ['grot2buy-v22', 'grot2buy-v21', 'grot2buy-v20', 'grot2buy-v19', 'grot2buy-v18', 'grot2buy-v17', 'grot2buy-v16'];
@@ -492,6 +531,8 @@ async function showOfflineFallback() {
     content.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><h3>' + __('error.load_title') + '</h3><p>' + __('error.load_text') + '</p></div>';
 }
 
+// Rendert die synced-Liste: gruppiert nach Kategorie, alphabetisch sortiert
+// Zeigt im Batch-Modus zusätzlich die Auswahlleiste an
 function renderSyncedItems(data) {
     const content = document.getElementById('content');
     const items = data.items || [];
@@ -504,8 +545,10 @@ function renderSyncedItems(data) {
         return;
     }
 
+    // Kategorien alphabetisch sortieren
     const sortedCategories = Object.keys(byCategory).sort((a, b) => a.localeCompare(b));
 
+    // Batch-Auswahlleiste: je nach Modus unterschiedliche Buttons
     const selectBarHtml = selectMode
         ? `<div class="select-bar">
             <button class="btn btn-sm" onclick="toggleSelectMode()">${__('tab.done')}</button>
@@ -540,6 +583,7 @@ function renderSyncedItems(data) {
     `;
 }
 
+// Rendert die Artikel einer BAP-Liste (einfache Liste ohne Kategorie-Gruppierung)
 function renderBAPItems(data) {
     const content = document.getElementById('content');
     const items = data.items || [];
@@ -558,6 +602,7 @@ function renderBAPItems(data) {
     `;
 }
 
+// Rendert die Grocy-Liste (Grocy-Einkaufsliste, schreibgeschützt)
 function renderGrocyItems(data) {
     const content = document.getElementById('content');
     const items = data.items || [];
@@ -588,6 +633,7 @@ function renderGrocyItems(data) {
     `;
 }
 
+// Rendert einen einzelnen synced-Artikel mit Checkbox, Name, Kategorie, Menge und Delete-Button
 function renderItem(item) {
     const qty = item.quantity || 1;
     const stockHtml = item.stock !== undefined ? ` · ${__('item.stock', {n: item.stock})}` : '';
@@ -616,6 +662,7 @@ function renderItem(item) {
     `;
 }
 
+// Rendert einen BAP-Artikel (anderes Datenformat: title/amount statt name/quantity)
 function renderBAPItem(item) {
     return `
         <div class="item">
@@ -632,12 +679,14 @@ function renderBAPItem(item) {
 
 // ─── Item Actions ────────────────────────────────────────────
 
+// Markiert einen synced-Artikel als gekauft/nicht gekauft (Toggle)
 async function togglePurchased(name) {
     const res = await api(`/items/${encodeURIComponent(name)}/purchased`, { method: 'POST' });
     toast(res.result);
     loadItems();
 }
 
+// Entfernt einen Artikel in den Papierkorb (mit Rückgängig-Funktion)
 async function removeItem(name) {
     if (!confirm( __('item.remove_confirm', {name: name}) )) return;
     const res = await api(`/items/${encodeURIComponent(name)}/remove`, { method: 'POST' });
@@ -645,12 +694,14 @@ async function removeItem(name) {
     undoToast(res.result, () => api(`/trash/restore/${encodeURIComponent(name)}`, { method: 'POST' }));
 }
 
+// Schaltet den Batch-Auswahlmodus ein/aus
 function toggleSelectMode() {
     selectMode = !selectMode;
     selectedItems.clear();
     loadItems();
 }
 
+// Wählt einen Artikel im Batch-Modus aus oder ab (ohne vollständiges Re-Rendering)
 function toggleItemSelect(name, el) {
     if (!selectMode) return;
     if (selectedItems.has(name)) {
@@ -659,7 +710,7 @@ function toggleItemSelect(name, el) {
         selectedItems.add(name);
     }
     updateBatchToolbar();
-    // Update visual state without full re-render
+    // Visuellen Zustand ohne vollständiges Re-Rendering aktualisieren
     const items = document.querySelectorAll('.item');
     items.forEach(item => {
         if (item.dataset.name === name) {
@@ -670,6 +721,7 @@ function toggleItemSelect(name, el) {
     });
 }
 
+// Wählt alle nicht-gekauften Artikel im Batch-Modus aus
 function selectAllItems() {
     const items = document.querySelectorAll('.item[data-name]');
     items.forEach(item => {
@@ -684,6 +736,7 @@ function selectAllItems() {
     updateBatchToolbar();
 }
 
+// Hebt alle Auswahl im Batch-Modus auf
 function deselectAllItems() {
     document.querySelectorAll('.item.selected').forEach(el => {
         el.classList.remove('selected');
@@ -695,11 +748,13 @@ function deselectAllItems() {
     updateBatchToolbar();
 }
 
+// Aktualisiert den Zähler in der Batch-Auswahlleiste
 function updateBatchToolbar() {
     const count = document.getElementById('batchCount');
     count.textContent = selectedItems.size;
 }
 
+// Markiert alle ausgewählten Artikel als gekauft (Batch)
 async function batchPurchaseSelected() {
     const names = Array.from(selectedItems);
     if (names.length === 0) return;
@@ -712,6 +767,7 @@ async function batchPurchaseSelected() {
     loadItems();
 }
 
+// Entfernt alle ausgewählten Artikel (Batch) in den Papierkorb
 async function batchRemoveSelected() {
     const names = Array.from(selectedItems);
     if (names.length === 0) return;
@@ -725,6 +781,7 @@ async function batchRemoveSelected() {
     loadItems();
 }
 
+// Erhöht/verringert die Menge eines Artikels um delta (+1 oder -1, mindestens 1)
 async function changeItemQty(name, delta) {
     const items = document.querySelectorAll('.item');
     let currentQty = 1;
@@ -741,6 +798,7 @@ async function changeItemQty(name, delta) {
     loadItems();
 }
 
+// Markiert einen BAP-Artikel als gekauft (noch nicht vollständig implementiert)
 async function markBAPPurchased(listId, itemId) {
     toast(__('sync.start'));
     loadItems();
@@ -748,15 +806,17 @@ async function markBAPPurchased(listId, itemId) {
 
 // ─── Add Item ────────────────────────────────────────────────
 
+// Öffnet den "Neuen Artikel"-Dialog mit leeren Feldern und lädt Vorschläge
 function openAddModal() {
     document.getElementById('addModal').classList.add('open');
     document.getElementById('itemName').value = '';
     document.getElementById('itemQuantity').value = '1';
     document.getElementById('itemName').focus();
     loadListOptions();
-    loadSuggestions(); // initial load for recently added items
+    loadSuggestions(); // Initiale Suche nach zuletzt verwendeten Artikeln
 }
 
+// Lädt Auto-Vervollständigungs-Vorschläge basierend auf der aktuellen Eingabe
 async function loadSuggestions() {
     const q = document.getElementById('itemName').value.trim();
     if (!q) { document.getElementById('suggestionsList').innerHTML = ''; return; }
@@ -767,6 +827,7 @@ async function loadSuggestions() {
     } catch (e) {}
 }
 
+// Entprellte Version von loadSuggestions (300ms Verzögerung nach letztem Tastendruck)
 const debouncedSuggestions = (() => {
     let timer;
     return () => {
@@ -775,12 +836,14 @@ const debouncedSuggestions = (() => {
     };
 })();
 
+// Öffnet den Share-Dialog und lädt bestehende Share-Tokens
 async function openShareModal() {
     closeModal('settingsModal');
     document.getElementById('shareModal').classList.add('open');
     await loadShareTokens();
 }
 
+// Lädt aktive Share-Tokens und zeigt sie in der Liste an
 async function loadShareTokens() {
     const section = document.getElementById('shareTokensSection');
     const list = document.getElementById('shareTokensList');
@@ -801,6 +864,7 @@ async function loadShareTokens() {
     } catch (e) {}
 }
 
+// Erstellt einen neuen Share-Token und kopiert den Link in die Zwischenablage
 async function createShareToken() {
     const res = await api('/share/create', {
         method: 'POST',
@@ -817,12 +881,14 @@ async function createShareToken() {
     }
 }
 
+// Widerruft einen Share-Token anhand seiner UID
 async function revokeShareToken(uid) {
     await api('/share/revoke', { method: 'POST', body: { uid } });
     toast(__('share.revoked') || 'Token widerrufen.');
     await loadShareTokens();
 }
 
+// Event-Delegation für Revoke-Buttons (keine Inline-onclick-Attribute)
 document.addEventListener('click', function(e) {
     const btn = e.target.closest('[data-share-uid]');
     if (btn) {
@@ -830,6 +896,7 @@ document.addEventListener('click', function(e) {
     }
 });
 
+// Befüllt das Ziel-Listen-Auswahlfeld (Synced + alle BAP-Listen)
 async function loadListOptions() {
     const sel = document.getElementById('itemList');
     sel.innerHTML = '<option value="synced">' + __('add_modal.target_synced') + '</option>';
@@ -841,6 +908,7 @@ async function loadListOptions() {
     } catch (e) {}
 }
 
+// Fügt einen neuen Artikel hinzu (Name, Menge, Kategorie, Ziel-Liste)
 async function addItem() {
     const name = document.getElementById('itemName').value.trim();
     const quantity = parseInt(document.getElementById('itemQuantity').value) || 1;
@@ -874,6 +942,7 @@ async function addItem() {
     }
 }
 
+// Ändert die Menge im Add-Modal um delta (+1 oder -1)
 function changeQuantity(delta) {
     const input = document.getElementById('itemQuantity');
     const current = parseInt(input.value) || 1;
@@ -882,10 +951,12 @@ function changeQuantity(delta) {
 
 // ─── Sync ────────────────────────────────────────────────────
 
+// Führt einen vollständigen bidirektionalen Sync mit Grocy und BAP durch
 async function syncWithBAP() {
     const btn = document.getElementById('syncBtn');
     const pill = document.getElementById('syncStatus');
     btn.classList.add('syncing');
+    // Sync-Pill auf "wird synchronisiert" setzen
     if (pill) {
         pill.dataset.status = 'syncing';
         document.getElementById('pillPath').setAttribute('d', 'M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z');
@@ -909,6 +980,7 @@ async function syncWithBAP() {
     }
 }
 
+// Holt die Grocy-Einkaufsliste ab (einseitiger Pull ohne Rück-Schreiben)
 async function pullFromGrocy() {
     toast( __('sync.pull_start') );
     try {
@@ -923,6 +995,7 @@ async function pullFromGrocy() {
 
 // ─── Settings ────────────────────────────────────────────────
 
+// Öffnet das Einstellungs-Modal und lädt aktuelle Konfiguration
 async function openSettings() {
     document.getElementById('settingsModal').classList.add('open');
     try {
@@ -933,6 +1006,7 @@ async function openSettings() {
     if (sel) sel.value = localStorage.getItem('grot2buy_theme') || 'auto';
 }
 
+// Speichert die Buy-Me-a-Pie-Zugangsdaten
 async function saveBAPConfig() {
     const user = document.getElementById('bapUser').value;
     const pass = document.getElementById('bapPass').value;
@@ -947,6 +1021,7 @@ async function saveBAPConfig() {
     loadLists();
 }
 
+// Exportiert die Liste als Text und kopiert sie in die Zwischenablage
 async function exportList() {
     const data = await api('/export');
     if (data.export) {
@@ -955,6 +1030,7 @@ async function exportList() {
     }
 }
 
+// Entfernt alle als gekauft markierten Artikel aus der synced-Liste
 async function clearPurchased() {
     if (!confirm( __('item.clear_confirm') )) return;
     const res = await api('/items/clear-purchased', { method: 'POST' });
@@ -964,6 +1040,7 @@ async function clearPurchased() {
 
 // ─── Trash ─────────────────────────────────────────────────────
 
+// Öffnet den Papierkorb und lädt die gelöschten Artikel
 async function showTrash() {
     const modal = document.getElementById('trashModal');
     modal.classList.add('open');
@@ -989,10 +1066,12 @@ async function showTrash() {
     }
 }
 
+// Schließt den Papierkorb
 function hideTrash() {
     document.getElementById('trashModal').classList.remove('open');
 }
 
+// Stellt einen gelöschten Artikel aus dem Papierkorb wieder her
 async function restoreFromTrash(name, btn) {
     btn.disabled = true;
     btn.textContent = '…';
@@ -1002,6 +1081,7 @@ async function restoreFromTrash(name, btn) {
     showTrash();
 }
 
+// Leert den gesamten Papierkorb (endgültiges Löschen)
 async function emptyTrash() {
     if (!confirm(__('trash.confirm_empty'))) return;
     const res = await api('/trash/empty', { method: 'POST' });
@@ -1012,6 +1092,7 @@ async function emptyTrash() {
 
 // ─── Language ────────────────────────────────────────────────
 
+// Setzt die Sprache (Server-seitig) und lädt die Seite nach 1s neu
 async function setLanguage(lang) {
     const res = await api('/config/lang', {
         method: 'POST',
@@ -1025,18 +1106,22 @@ async function setLanguage(lang) {
 
 // ─── Helpers ─────────────────────────────────────────────────
 
+// Öffnet das Hilfe-Modal (Tastaturkürzel, Bedienungshinweise)
 function openHelp() {
     document.getElementById('helpModal').classList.add('open');
 }
 
+// Schließt ein beliebiges Modal anhand seiner ID
 function closeModal(id) {
     document.getElementById(id).classList.remove('open');
 }
 
+// Scrollt den Content-Bereich nach oben (z. B. nach Tab-Wechsel)
 function scrollToTop() {
     document.getElementById('content').scrollTop = 0;
 }
 
+// Bereinigt Benutzereingaben gegen XSS – wandelt Sonderzeichen in HTML-Entities um
 function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str;
@@ -1045,6 +1130,8 @@ function escapeHtml(str) {
 
 // ─── Docs Viewer ─────────────────────────────────────────────
 
+// Einfacher Markdown-Parser (Client-seitig, ohne Bibliothek)
+// Unterstützt: # H1, ## H2, ### H3, - Listen, num. Listen, ```code```, ---, Absätze
 function renderMarkdown(md) {
     const lines = md.split('\n');
     let html = '';
@@ -1055,6 +1142,7 @@ function renderMarkdown(md) {
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
 
+        // Code-Block umschalten (```)
         if (line.startsWith('```')) {
             if (inCode) {
                 html += '<pre><code>' + escapeHtml(codeBuf.join('\n')) + '</code></pre>\n';
@@ -1067,6 +1155,7 @@ function renderMarkdown(md) {
         }
         if (inCode) { codeBuf.push(line); continue; }
 
+        // Überschriften
         if (line.startsWith('### ')) {
             if (inList) { html += '</ul>\n'; inList = false; }
             html += '<h3>' + escapeHtml(line.slice(4)) + '</h3>\n';
@@ -1083,37 +1172,44 @@ function renderMarkdown(md) {
             continue;
         }
 
+        // Ungeordnete Liste
         if (line.startsWith('- ') || line.startsWith('* ')) {
             if (!inList) { html += '<ul>\n'; inList = true; }
             html += '<li>' + escapeHtml(line.slice(2)) + '</li>\n';
             continue;
         }
 
+        // Nummerierte Liste
         if (line.match(/^\d+\.\s/)) {
             if (!inList) { html += '<ol>\n'; inList = 'ol'; }
             html += '<li>' + escapeHtml(line.replace(/^\d+\.\s/, '')) + '</li>\n';
             continue;
         }
 
+        // Leerzeile → Liste schließen
         if (line.trim() === '') {
             if (inList) { html += '</ul>\n'; inList = false; }
             continue;
         }
 
+        // Horizontale Trennlinie
         if (line.startsWith('---')) {
             if (inList) { html += '</ul>\n'; inList = false; }
             html += '<hr>\n';
             continue;
         }
 
+        // Normaler Absatz
         if (inList) { html += '</ul>\n'; inList = false; }
         html += '<p>' + escapeHtml(line) + '</p>\n';
     }
+    // Offene Tags schließen
     if (inCode) html += '<pre><code>' + escapeHtml(codeBuf.join('\n')) + '</code></pre>\n';
     if (inList) html += '</ul>\n';
     return html;
 }
 
+// Lädt ein Dokument (Doku/Changelog) vom Server und zeigt es sicher im Modal an
 async function openDocs(type) {
     try {
         const data = await api('/docs/' + type);
@@ -1121,6 +1217,7 @@ async function openDocs(type) {
         document.getElementById('docsModalTitle').textContent = data.title || (type === 'doku' ? __('settings.docs_doku') : __('settings.docs_changelog'));
         const container = document.getElementById('docsBody');
         container.textContent = '';
+        // XSS-Prävention: DOM-Parser mit anschließender Bereinigung
         const safe = document.createElement('div');
         safe.innerHTML = data.html;
         safe.querySelectorAll('script, style, iframe, object, embed').forEach(el => el.remove());
@@ -1137,6 +1234,7 @@ async function openDocs(type) {
     }
 }
 
+// Lädt die Server-Logs und rendert sie mit Syntax-Highlighting
 async function openLogs() {
     try {
         const data = await api('/logs');
@@ -1147,6 +1245,7 @@ async function openLogs() {
         const pre = document.createElement('pre');
         pre.className = 'log-viewer';
         let html = escapeHtml(data.logs || '');
+        // Log-Level farblich hervorheben
         html = html
             .replace(/(\[ERROR\])/g, '<span class="log-error">$1</span>')
             .replace(/(\[WARNING\]|\[WARN\])/g, '<span class="log-warn">$1</span>')
@@ -1163,7 +1262,7 @@ async function openLogs() {
     }
 }
 
-// Enter zum Hinzufügen
+// Enter-Taste im Add-Modal löst addItem() aus
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && document.getElementById('addModal').classList.contains('open')) {
         if (document.activeElement.id === 'itemName') {
@@ -1172,7 +1271,7 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// Auto-Vervollständigung beim Tippen
+// Auto-Vervollständigung: bei jeder Eingabe im Namensfeld Vorschläge laden
 document.getElementById('itemName').addEventListener('input', () => {
     debouncedSuggestions();
 });

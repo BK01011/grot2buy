@@ -4,8 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Grot2Buy</title>
+    <!-- Stylesheet und Favicon -->
     <link rel="stylesheet" href="/static/style.css?v=24">
     <link rel="icon" href="/static/logo.svg?v=24" type="image/svg+xml">
+    <!-- PWA-Manifest und Apple-spezifische Meta-Tags -->
     <link rel="manifest" href="/static/manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -23,13 +25,16 @@
                     <img src="/static/logo.svg?v=24" alt="Grot2Buy" class="header-logo">
                     <h1>{{ t("header.title") }}</h1>
                 </div>
+                <!-- Aktions-Buttons: Sync, Papierkorb, Dark Mode, Hilfe, Einstellungen -->
                 <div class="header-right">
+                <!-- Sync-Button: startet bidirektionale Synchronisation -->
                 <button class="btn-icon" onclick="syncWithBAP()" title="{{ t('header.sync') }}" id="syncBtn">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
                         <path d="M21 3v5h-5"/>
                     </svg>
                 </button>
+                <!-- Papierkorb: gelöschte Artikel wiederherstellen -->
                 <button class="btn-icon" onclick="showTrash()" title="{{ t('trash.title') }}" id="trashBtn">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M3 6h18"/>
@@ -38,6 +43,7 @@
                         <line x1="14" y1="11" x2="14" y2="17"/>
                     </svg>
                 </button>
+                <!-- Dark Mode umschalten -->
                 <button class="btn-icon" id="darkModeBtn" onclick="toggleDarkMode()" title="{{ t('header.darkmode') }}">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="5"/>
@@ -47,6 +53,7 @@
                         <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
                     </svg>
                 </button>
+                <!-- Hilfe / Info öffnen -->
                 <button class="btn-icon" onclick="openHelp()" title="{{ t('header.help') }}">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="12" cy="12" r="10"/>
@@ -54,6 +61,7 @@
                         <circle cx="12" cy="17" r="0.8" fill="currentColor" stroke="none"/>
                     </svg>
                 </button>
+                <!-- Einstellungen öffnen -->
                 <button class="btn-icon" onclick="openSettings()" title="{{ t('header.settings') }}">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="3"/>
@@ -62,6 +70,7 @@
                 </button>
             </div>
             </div>
+            <!-- Sync-Status-Anzeige (Pill) -->
             <div class="sync-bar">
                 <span class="sync-pill" id="syncStatus" title="{{ t('sync.status_never') }}">
                     <svg class="pill-icon" viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
@@ -72,28 +81,29 @@
             </div>
         </header>
 
-        <!-- Tabs: Listen -->
+        <!-- Tabs: zwischen Synced- und Grocy-Liste umschalten -->
         <div class="tabs" id="listTabs">
             <button class="tab active" data-list="synced" onclick="switchTab('synced', this)">{{ t("tab.synced") }}</button>
             <button class="tab" data-list="grocy" onclick="switchTab('grocy', this)">{{ t("tab.grocy") }}</button>
         </div>
 
-        <!-- Content -->
+        <!-- Haupt-Inhaltsbereich: wird dynamisch mit Artikeln befüllt -->
         <main class="content" id="content">
+            <!-- Ladeanzeige beim initialen Laden -->
             <div class="loading" id="loading">
                 <div class="spinner"></div>
                 <p>{{ t("loading.data") }}</p>
             </div>
         </main>
 
-        <!-- FAB: Artikel hinzufügen -->
+        <!-- Floating Action Button: neuen Artikel hinzufügen -->
         <button class="fab" onclick="openAddModal()" title="{{ t('header.add') }}">
             <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5">
                 <line x1="12" y1="5" x2="12" y2="19"/>
                 <line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
         </button>
-        <!-- Select-Status (wird dynamisch eingefügt) -->
+        <!-- FAB für Artikelanzahl: nach oben scrollen -->
         <div class="item-count-fab" id="itemCount" onclick="scrollToTop()" title="{{ t('header.scroll_top') }}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="5 14 12 7 19 14"/>
@@ -102,14 +112,14 @@
             <span id="itemCountValue">0</span>
         </div>
 
-        <!-- Offline-Badge -->
+        <!-- Offline-Badge: wird bei fehlender Netzverbindung eingeblendet -->
         <div id="offlineBadge" class="offline-badge"></div>
 
-        <!-- Toast-Container -->
+        <!-- Toast-Container für Benachrichtigungen -->
         <div id="toastContainer" class="toast-container"></div>
     </div>
 
-    <!-- Ansicht: Papierkorb (initially hidden) -->
+    <!-- ─── Papierkorb-Modal (gelöschte Artikel anzeigen/wiederherstellen) ─── -->
     <div class="modal" id="trashModal">
         <div class="modal-backdrop" onclick="hideTrash()"></div>
         <div class="modal-content">
@@ -131,7 +141,7 @@
         </div>
     </div>
 
-    <!-- Modal: Artikel hinzufügen -->
+    <!-- ─── Hinzufügen-Modal (neuen Artikel anlegen) ─── -->
     <div class="modal" id="addModal">
         <div class="modal-content">
             <div class="modal-header">
@@ -139,11 +149,13 @@
                 <button class="btn-close" onclick="closeModal('addModal')">&times;</button>
             </div>
             <div class="modal-body">
+                <!-- Artikelname mit Auto-Vervollständigung -->
                 <div class="input-group">
                     <input type="text" id="itemName" placeholder="{{ t('add_modal.name_placeholder') }}" autocomplete="off" list="suggestionsList">
                     <datalist id="suggestionsList"></datalist>
                 </div>
                 <div class="input-row">
+                    <!-- Mengenauswahl -->
                     <div class="input-group small">
                         <label>{{ t("add_modal.quantity") }}</label>
                         <div class="quantity-control">
@@ -152,6 +164,7 @@
                             <button onclick="changeQuantity(1)">+</button>
                         </div>
                     </div>
+                    <!-- Kategorieauswahl -->
                     <div class="input-group small">
                         <label>{{ t("add_modal.category") }}</label>
                         <select id="itemCategory">
@@ -159,6 +172,7 @@
                         </select>
                     </div>
                 </div>
+                <!-- Zielliste (Synced / Grocy) -->
                 <div class="input-group">
                     <label>{{ t("add_modal.target_list") }}</label>
                     <select id="itemList">
@@ -173,7 +187,7 @@
         </div>
     </div>
 
-    <!-- Modal: Einstellungen -->
+    <!-- ─── Einstellungen-Modal ─── -->
     <div class="modal" id="settingsModal">
         <div class="modal-content">
             <div class="modal-header">
@@ -181,6 +195,7 @@
                 <button class="btn-close" onclick="closeModal('settingsModal')">&times;</button>
             </div>
             <div class="modal-body">
+                <!-- Buy Me a Pie Anmeldedaten -->
                 <div class="settings-section">
                     <h3>{{ t("settings.bap_section") }}</h3>
                     <div class="input-group">
@@ -193,6 +208,7 @@
                     </div>
                     <button class="btn btn-primary" onclick="saveBAPConfig()">{{ t("settings.bap_save") }}</button>
                 </div>
+                <!-- Sprache -->
                 <div class="settings-section">
                     <h3>{{ t("settings.lang_section") }}</h3>
                     <div class="input-group">
@@ -204,6 +220,7 @@
                         </select>
                     </div>
                 </div>
+                <!-- Darstellung / Dark Mode -->
                 <div class="settings-section">
                     <h3>{{ t("settings.appearance_section") }}</h3>
                     <div class="input-group">
@@ -215,6 +232,7 @@
                         </select>
                     </div>
                 </div>
+                <!-- Aktionen: Export, Teilen, Gekaufte leeren -->
                 <div class="settings-section">
                     <h3>{{ t("settings.actions_section") }}</h3>
                     <button class="btn btn-secondary full-width" onclick="exportList()">{{ t("settings.export") }}</button>
@@ -225,7 +243,7 @@
         </div>
     </div>
 
-    <!-- Modal: Hilfe / Über -->
+    <!-- ─── Hilfe/Über-Modal ─── -->
     <div class="modal" id="helpModal">
         <div class="modal-content">
             <div class="modal-header">
@@ -233,10 +251,12 @@
                 <button class="btn-close" onclick="closeModal('helpModal')">&times;</button>
             </div>
             <div class="modal-body help-body">
+                <!-- Versionsinfo -->
                 <div class="help-section">
                     <h3>{{ t("help.about_title") }}</h3>
                     <p>{{ t("help.about_text", version=version) }}</p>
                 </div>
+                <!-- Bedienungsanleitung -->
                 <div class="help-section">
                     <h3>{{ t("help.usage_title") }}</h3>
                     <ul class="help-list">
@@ -251,12 +271,14 @@
                         <li>{{ t("help.usage_pwa") }}</li>
                     </ul>
                 </div>
+                <!-- Credits / Lizenz -->
                 <div class="help-section">
                     <h3>{{ t("help.credits_title") }}</h3>
                     <p>{{ t("help.credits_author") }}</p>
                     <p>{{ t("help.credits_thanks") }}</p>
                     <p class="help-license">{{ t("help.credits_license") }}</p>
                 </div>
+                <!-- Dokumentation, Changelog, Logs -->
                 <div class="help-section">
                     <h3>{{ t("settings.docs_section") }}</h3>
                     <button class="btn btn-secondary full-width" onclick="closeModal('helpModal');openDocs('doku')">{{ t("settings.docs_doku") }}</button>
@@ -267,7 +289,7 @@
         </div>
     </div>
 
-    <!-- Share Modal -->
+    <!-- ─── Teilen-Modal (Share-Tokens verwalten) ─── -->
     <div class="modal" id="shareModal">
         <div class="modal-content">
             <div class="modal-header">
@@ -287,7 +309,7 @@
         </div>
     </div>
 
-    <!-- Docs Modal -->
+    <!-- ─── Dokumentations-Modal (Doku / Changelog) ─── -->
     <div class="modal" id="docsModal" onclick="if(event.target===this)closeModal('docsModal')">
         <div class="modal-content docs-modal">
             <div class="modal-header">
@@ -298,11 +320,13 @@
         </div>
     </div>
 
-    <!-- Toast -->
+    <!-- Einfacher Toast für Hinweise -->
     <div class="toast" id="toast"></div>
 
+    <!-- Übersetzungen (flach als JSON) und App-Skript -->
     <script>window._t = {{ t_flat | tojson }};</script>
     <script src="/static/app.js?v=24"></script>
+    <!-- Service Worker für Offline-Funktionalität registrieren -->
     <script>if('serviceWorker'in navigator){navigator.serviceWorker.register('/static/sw.js?v=24').then(r=>r.update())}</script>
 </body>
 </html>

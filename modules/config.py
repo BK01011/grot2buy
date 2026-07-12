@@ -16,11 +16,16 @@ KEY_FILE = DATA_DIR / "secret.key"
 
 
 def _load_or_create_key() -> bytes:
+    """Lädt den vorhandenen Fernet-Verschlüsselungsschlüssel oder erstellt einen neuen.
+
+    Der Schlüssel wird in data/secret.key abgelegt und auf 0o600 gesetzt,
+    sodass nur der Eigentümer lesen kann.
+    """
     if KEY_FILE.exists():
         return KEY_FILE.read_bytes()
     key = Fernet.generate_key()
     KEY_FILE.write_bytes(key)
-    os.chmod(str(KEY_FILE), 0o600)
+    os.chmod(str(KEY_FILE), 0o600)  # nur Besitzer darf lesen
     return key
 
 
@@ -28,26 +33,41 @@ _fernet = Fernet(_load_or_create_key())
 
 
 def encrypt(value: str) -> str:
+    """Verschlüsselt einen Klartext-String mit dem Fernet-Schlüssel."""
     return _fernet.encrypt(value.encode()).decode()
 
 
 def decrypt(token: str) -> str:
+    """Entschlüsselt einen Fernet-Token zurück in den Klartext."""
     return _fernet.decrypt(token.encode()).decode()
 
 
 def _atomic_write(path: Path, content: str):
+    """Schreibt eine Datei atomar via .tmp-Datei, um Datenverlust zu vermeiden.
+
+    Schreibt zuerst in eine temporäre Datei, setzt Berechtigungen auf 0o600
+    und ersetzt dann das Ziel – so bleibt bei Abstürzen die alte Datei erhalten.
+    """
     tmp = path.with_suffix(".tmp")
     tmp.write_text(content, encoding="utf-8")
-    os.chmod(str(tmp), 0o600)
+    os.chmod(str(tmp), 0o600)  # nur Besitzer darf lesen
     tmp.replace(path)
 
 
 class Config:
+    """Zentrale Konfigurationsverwaltung mit Verschlüsselung sensibler Daten.
+
+    Speichert alle Einstellungen in einer JSON-Datei (data/config.json).
+    Sensible Felder (API-Keys, Passwörter) werden mit Fernet verschlüsselt
+    und als {"__encrypted__": True, "value": "..."} abgelegt.
+    """
+
     def __init__(self):
         self._data: dict = {}
         self.load()
 
     def load(self):
+        """Lädt die Konfiguration aus der JSON-Datei."""
         if CONFIG_FILE.exists():
             try:
                 with open(CONFIG_FILE, "r") as f:
@@ -55,26 +75,32 @@ class Config:
             except (json.JSONDecodeError, OSError) as e:
                 logger.error(f"Config-Datei korrupt: {e}")
                 self._data = {}
+        # Migration: fehlenden timestamp für auth_token nachtragen
         if self.auth_token and not self._data.get("auth_token_created_at"):
             self._data["auth_token_created_at"] = datetime.now(timezone.utc).isoformat()
             self.save()
 
     def save(self):
+        """Schreibt die Konfiguration atomar auf die Festplatte."""
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         _atomic_write(CONFIG_FILE, json.dumps(self._data, indent=2, ensure_ascii=False))
 
     def get(self, key: str, default=None):
+        """Gibt einen Konfigurationswert zurück."""
         return self._data.get(key, default)
 
     def set(self, key: str, value):
+        """Setzt einen Konfigurationswert und speichert sofort."""
         self._data[key] = value
         self.save()
 
     def set_encrypted(self, key: str, value: str):
+        """Verschlüsselt einen Wert und speichert ihn in der Konfiguration."""
         self._data[key] = {"__encrypted__": True, "value": encrypt(value)}
         self.save()
 
     def get_decrypted(self, key: str, default=None) -> Optional[str]:
+        """Liest einen verschlüsselten Wert aus der Konfiguration und entschlüsselt ihn."""
         val = self._data.get(key)
         if val is None:
             return default
@@ -168,11 +194,13 @@ class Config:
     TOKEN_MAX_AGE_DAYS = 30
 
     def set_auth_token(self, token: str):
+        """Setzt einen neuen Authentifizierungs-Token (verschlüsselt) mit Zeitstempel."""
         self._data["auth_token"] = {"__encrypted__": True, "value": encrypt(token)}
         self._data["auth_token_created_at"] = datetime.now(timezone.utc).isoformat()
         self.save()
 
     def validate_token(self, token: str) -> bool:
+        """Prüft einen Token gegen den gespeicherten (konstante Zeit, Altersprüfung)."""
         stored = self.auth_token
         if not stored:
             return False
@@ -183,6 +211,7 @@ class Config:
             created = datetime.fromisoformat(created_at)
             if created.tzinfo is None:
                 created = created.replace(tzinfo=timezone.utc)
+            # Token älter als TOKEN_MAX_AGE_DAYS → ungültig
             if (datetime.now(timezone.utc) - created).days >= self.TOKEN_MAX_AGE_DAYS:
                 return False
         except Exception:
@@ -190,6 +219,7 @@ class Config:
         return secrets.compare_digest(token, stored)
 
     def reset_auth_tokens(self):
+        """Entfernt alle Auth-Tokens und zwingt Benutzer zum erneuten Einloggen."""
         self._data.pop("auth_token", None)
         self._data.pop("auth_token_created_at", None)
         self.save()

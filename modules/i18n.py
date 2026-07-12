@@ -14,8 +14,10 @@ _cache: dict[str, dict] = {}
 _cache_order: list[str] = []
 
 def _load(lang: str) -> dict:
+    """Lädt eine Sprachdatei aus i18n/{lang}.json in den Cache (LRU, max 10)."""
     lang = lang or "de"
     if lang not in _cache:
+        # Ältesten Cache-Eintrag entfernen, wenn Limit erreicht
         if len(_cache) >= MAX_CACHED_LANGUAGES:
             oldest = _cache_order.pop(0)
             _cache.pop(oldest, None)
@@ -28,7 +30,7 @@ def _load(lang: str) -> dict:
     return _cache[lang]
 
 def flattened(lang: str) -> dict[str, str]:
-    """Flatten translation dict to dot-separated keys for JS."""
+    """Wandelt das geschachtelte Übersetzungs-Dict in Punkt-Notation für JS um."""
     result = {}
     def _walk(d, prefix=""):
         for k, v in d.items():
@@ -68,6 +70,6 @@ def t(key: str, lang: str = "de", **kwargs) -> str:
     return val
 
 def reload():
-    """Leert den Cache – beim nächsten t()-Aufruf wird neu geladen."""
+    """Leert den Übersetzungs-Cache – beim nächsten t()-Aufruf wird neu von Disk geladen."""
     _cache.clear()
     _cache_order.clear()

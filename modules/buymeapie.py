@@ -14,6 +14,7 @@ class BuyMeAPieClient:
     BASE_URL = "https://app.buymeapie.com"
 
     def __init__(self, username: str, password: str):
+        """Initialisiert den Client mit Basic-Auth und iPhone-User-Agent."""
         self.username = username
         self.password = password
         self.session = requests.Session()
@@ -23,7 +24,7 @@ class BuyMeAPieClient:
             "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)",
         })
         self.session.auth = (username, password)
-        self.password = None
+        self.password = None  # Passwort nach Initialisierung aus dem Speicher entfernen
         self._logged_in = False
 
     def _get(self, url: str) -> requests.Response:
@@ -43,7 +44,7 @@ class BuyMeAPieClient:
         return self.session.delete(url, timeout=_REQUEST_TIMEOUT)
 
     def login(self) -> bool:
-        """Login bei Buy Me a Pie."""
+        """Login bei Buy Me a Pie via /bauth-Endpunkt."""
         try:
             resp = self._get(f"{self.BASE_URL}/bauth")
             if resp.status_code == 200:
@@ -55,6 +56,7 @@ class BuyMeAPieClient:
             return False
 
     def _ensure_login(self):
+        """Stellt sicher, dass die Session angemeldet ist – login bei Bedarf."""
         if not self._logged_in:
             self.login()
 
@@ -71,7 +73,7 @@ class BuyMeAPieClient:
             return []
 
     def get_list_items(self, list_id: str) -> list:
-        """Holt alle Artikel einer Liste."""
+        """Holt alle Artikel einer Liste (inkl. gekaufter und gelöschter)."""
         self._ensure_login()
         try:
             resp = self._get(f"{self.BASE_URL}/lists/{list_id}/items")
@@ -88,19 +90,18 @@ class BuyMeAPieClient:
         return [i for i in items if not i.get("is_purchased") and not i.get("deleted")]
 
     def get_default_list_id(self) -> Optional[str]:
-        """Findet die Standard-Einkaufsliste (namens 'Einkaufsliste')."""
+        """Findet die Standard-Einkaufsliste (Name enthält 'Einkauf'). Fallback: erste Liste."""
         lists = self.get_lists()
         for lst in lists:
             if "einkauf" in lst.get("name", "").lower():
                 return lst.get("id")
-        # Falls keine gefunden, nimm die erste
         return lists[0].get("id") if lists else None
 
     def add_item(self, list_id: str, name: str, quantity: int = 1) -> str:
         """Fügt einen Artikel zur Liste hinzu. Gibt 'added', 'exists' oder 'error' zurück."""
         self._ensure_login()
         try:
-            # Prüfe ob Artikel bereits existiert
+            # Prüfe ob Artikel bereits existiert (Dubletten vermeiden)
             existing = self.get_active_items(list_id)
             for item in existing:
                 if item.get("title", "").lower() == name.lower():
@@ -149,7 +150,7 @@ class BuyMeAPieClient:
             return False
 
     def mark_purchased(self, list_id: str, item_id: str) -> bool:
-        """Markiert einen Artikel als gekauft."""
+        """Markiert einen Artikel als gekauft (is_purchased=true)."""
         self._ensure_login()
         try:
             url = f"{self.BASE_URL}/lists/{list_id}/items/{item_id}"

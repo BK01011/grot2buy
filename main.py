@@ -19,7 +19,7 @@ import uuid
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-VERSION = "0.27.0"
+VERSION = "1.0.0"
 
 BASE_DIR = Path(__file__).parent
 LOG_FILE = BASE_DIR / "data" / "app.log"
@@ -75,11 +75,13 @@ DEFAULT_CATEGORIES = [
 PBKDF2_ITERATIONS = 600_000
 
 def hash_password(password: str) -> str:
+    """Passwort mit PBKDF2-HMAC-SHA256 und zufälligem Salt hashen (600k Iterationen)."""
     salt = secrets.token_hex(16)
     h = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), PBKDF2_ITERATIONS)
     return f"{salt}${h.hex()}"
 
 def verify_password(password: str, stored: str) -> bool:
+    """Passwort gegen einen PBKDF2-Hash prüfen (auch rückwärtskompatibel zu Klartext)."""
     if '$' not in stored:
         return secrets.compare_digest(password, stored)
     salt, h = stored.split('$', 1)
@@ -90,6 +92,7 @@ def verify_password(password: str, stored: str) -> bool:
 
 
 def verify_token(request: Request) -> bool:
+    """Authentifizierungs-Token prüfen (Bearer-Header oder Cookie). Gibt 401 bei ungültigem Token."""
     if not config.is_setup_complete:
         return True
     if not config.get("password", ""):
@@ -105,6 +108,7 @@ def verify_token(request: Request) -> bool:
 
 
 async def parse_json_body(request: Request) -> dict:
+    """JSON-Body sicher parsen, mit 400-Fehler bei ungültigem Format."""
     try:
         return await request.json()
     except JSONDecodeError:
@@ -112,6 +116,7 @@ async def parse_json_body(request: Request) -> dict:
 
 
 def _set_auth_cookie(response, token: str, secure: bool = False):
+    """Auth-Token als HTTP-Only-Cookie setzen (30 Tage gültig)."""
     response.set_cookie(
         "auth_token", token,
         httponly=True,
@@ -124,21 +129,25 @@ def _set_auth_cookie(response, token: str, secure: bool = False):
 # ─── WebSocket Connection Manager ──────────────────────────────
 
 class ConnectionManager:
+    """Verwaltet aktive WebSocket-Verbindungen für Live-Updates an alle Clients."""
     def __init__(self):
         self._connections: list[WebSocket] = []
         self._lock = asyncio.Lock()
 
     async def connect(self, websocket: WebSocket):
+        """Neuen WebSocket-Client anmelden und Verbindung akzeptieren."""
         await websocket.accept()
         async with self._lock:
             self._connections.append(websocket)
 
     async def disconnect(self, websocket: WebSocket):
+        """WebSocket-Client entfernen, wenn er die Verbindung trennt."""
         async with self._lock:
             if websocket in self._connections:
                 self._connections.remove(websocket)
 
     async def broadcast(self, message: dict):
+        """Nachricht an alle verbundenen Clients senden. Tote Verbindungen werden aufgeräumt."""
         dead = []
         async with self._lock:
             for ws in self._connections:
@@ -154,6 +163,7 @@ ws_manager = ConnectionManager()
 
 
 async def broadcast_sync_complete(result: str):
+    """Sync-Ergebnis per WebSocket an alle verbundenen Clients senden."""
     await ws_manager.broadcast({
         "type": "sync_complete",
         "result": result,
@@ -162,10 +172,12 @@ async def broadcast_sync_complete(result: str):
 
 
 async def broadcast_items_updated():
+    """Signal „Einkaufsliste geändert" an alle WebSocket-Clients senden."""
     await ws_manager.broadcast({"type": "items_updated"})
 
 
 async def _propagate_add(name: str, quantity: int = 1):
+    """Neuen Artikel asynchron an Buy Me a Pie/Grocy weitergeben (Fehler-tolerant)."""
     loop = asyncio.get_event_loop()
     try:
         await loop.run_in_executor(None, shopping_sync.propagate_add, name, quantity)
@@ -174,6 +186,7 @@ async def _propagate_add(name: str, quantity: int = 1):
 
 
 async def _propagate_remove(name: str):
+    """Löschen eines Artikels asynchron an die externen Dienste weitergeben."""
     loop = asyncio.get_event_loop()
     try:
         await loop.run_in_executor(None, shopping_sync.propagate_remove, name)
@@ -182,6 +195,7 @@ async def _propagate_remove(name: str):
 
 
 async def _propagate_mark_purchased(name: str):
+    """Kauf-Status eines Artikels asynchron an BAP/Grocy weitergeben."""
     loop = asyncio.get_event_loop()
     try:
         await loop.run_in_executor(None, shopping_sync.propagate_mark_purchased, name)
@@ -191,7 +205,9 @@ async def _propagate_mark_purchased(name: str):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Start- und Shutdown-Logik: Verbindungen aufbauen, Hintergrund-Sync starten/stoppen."""
     logger.info("Grot2Buy startet...")
+    # Buy Me a Pie-Zugangsdaten entschlüsseln und Client initialisieren
     bap_user = config.get_decrypted("bap_user", "")
     bap_pass = config.get_decrypted("bap_pass", "")
     if bap_user and bap_pass:
@@ -199,6 +215,7 @@ async def lifespan(app: FastAPI):
         logger.info("Buy Me a Pie verbunden")
     else:
         logger.info("Keine BAP-Zugangsdaten — lokaler Modus")
+    # Grocy-URL und API-Key aus der Konfiguration laden
     grocy_url = config.get_decrypted("grocy_url", "") or config.get("grocy_url", "")
     grocy_key = config.get_decrypted("grocy_key", "") or config.get("grocy_key", "")
     if grocy_url and grocy_key:
@@ -209,7 +226,9 @@ async def lifespan(app: FastAPI):
             logger.warning("Grocy Verbindung fehlgeschlagen")
     else:
         logger.info("Keine Grocy-Zugangsdaten")
+    # Sync-Engine mit beiden Clients verknüpfen
     shopping_sync.link_clients(bap=shopping_manager._bap, grocy=shopping_manager._grocy)
+    # Hintergrund-Auto-Sync als asynchrone Task starten
     sync_task = asyncio.create_task(_background_sync())
     yield
     sync_task.cancel()
@@ -221,6 +240,7 @@ async def lifespan(app: FastAPI):
 
 
 async def _background_sync():
+    """Auto-Sync-Schleife im konfigurierten Intervall. Läuft bis zum Server-Shutdown."""
     while True:
         try:
             interval = config.get("sync_interval", 5)
@@ -228,6 +248,7 @@ async def _background_sync():
                 await asyncio.sleep(interval * 60)
                 bap_client = shopping_manager._bap
                 grocy = shopping_manager._grocy
+                # Nur synchronisieren, wenn mindestens ein Client verbunden ist
                 if grocy or bap_client:
                     result = await shopping_sync.sync_full(grocy, bap_client)
                     logger.info(f"Auto-Sync: {result}")
@@ -287,6 +308,7 @@ async def generic_exception_handler(request, exc):
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Middleware für sicherheitsrelevante HTTP-Header (CSP, HSTS, XSS-Schutz, Cache)."""
     async def dispatch(self, request, call_next):
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
@@ -294,6 +316,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         response.headers["Content-Security-Policy"] = "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' ws:; img-src 'self' data:; font-src 'self'"
+        # API-Antworten nicht cachen (keine veralteten Daten ausliefern)
         if request.url.path.startswith("/api/"):
             response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
             response.headers["Pragma"] = "no-cache"
@@ -312,12 +335,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Statische Dateien (CSS, JS, Bilder) bereitstellen
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
 # ─── Seiten ────────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request, _: bool = Depends(verify_token)):
+    """Hauptseite der Einkaufsliste (leitet zum Setup weiter, falls nicht konfiguriert)."""
     if not config.get("setup_complete", False):
         return RedirectResponse("/setup", status_code=303)
     return templates.TemplateResponse(request, "shopping.html", template_context(request))
@@ -325,6 +350,7 @@ async def index(request: Request, _: bool = Depends(verify_token)):
 
 @app.get("/setup", response_class=HTMLResponse)
 async def setup_page(request: Request):
+    """Erstkonfigurations-Seite anzeigen (nur vor dem ersten Setup erreichbar)."""
     if config.get("setup_complete", False):
         return RedirectResponse("/", status_code=303)
     return templates.TemplateResponse(request, "setup.html", template_context(request))
@@ -332,6 +358,7 @@ async def setup_page(request: Request):
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
+    """Login-Seite anzeigen (nur wenn Setup abgeschlossen und Passwort gesetzt)."""
     if not config.is_setup_complete:
         return RedirectResponse("/", status_code=303)
     return templates.TemplateResponse(request, "login.html", template_context(request))
@@ -340,6 +367,7 @@ async def login_page(request: Request):
 _login_attempts: dict[str, list[float]] = {}
 
 def _client_ip(request: Request) -> str:
+    """Echte Client-IP ermitteln, auch hinter Reverse-Proxys (X-Forwarded-For, X-Real-IP)."""
     forwarded = request.headers.get("X-Forwarded-For", "")
     if forwarded:
         return forwarded.split(",")[0].strip()
@@ -349,10 +377,13 @@ def _client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 def _check_rate_limit(ip: str, max_attempts: int = 5, window: int = 300) -> bool:
+    """Login-Rate-Limiter: max. max_attempts Fehlversuche innerhalb von window Sekunden pro IP."""
     now = time.time()
+    # Dict vor Überlauf schützen (max. 10.000 Einträge)
     if len(_login_attempts) > 10000:
         _login_attempts.clear()
     attempts = _login_attempts.get(ip, [])
+    # Abgelaufene Einträge entfernen
     attempts = [t for t in attempts if now - t < window]
     _login_attempts[ip] = attempts
     if len(attempts) >= max_attempts:
@@ -362,6 +393,7 @@ def _check_rate_limit(ip: str, max_attempts: int = 5, window: int = 300) -> bool
 
 @app.post("/login")
 async def login_submit(request: Request, password: str = Form("")):
+    """Login-Formular verarbeiten: Passwort prüfen, Token ausstellen, Rate-Limiting."""
     client_ip = _client_ip(request)
     if not _check_rate_limit(client_ip):
         import asyncio
@@ -383,6 +415,7 @@ async def login_submit(request: Request, password: str = Form("")):
 
 @app.get("/logout")
 async def logout():
+    """Ausloggen: Auth-Cookie löschen und zur Login-Seite weiterleiten."""
     response = RedirectResponse("/login", status_code=303)
     response.delete_cookie("auth_token")
     return response
@@ -391,23 +424,27 @@ async def logout():
 BLOCKED_HOSTS = {"metadata.google.internal", "metadata.lxd"}
 
 def _validate_url(url: str) -> bool:
+    """SSRF-Prüfung: Erlaubt nur öffentliche HTTP(S)-URLs, blockt Loopback/Private/Metadaten-Hosts."""
     from urllib.parse import urlparse
     import ipaddress
     try:
         parsed = urlparse(url)
+        # Nur HTTP/HTTPS erlauben
         if parsed.scheme not in {"http", "https"}:
             return False
         host = parsed.hostname
         if not host:
             return False
+        # Bekannte Cloud-Metadaten-Endpoints blocken
         if host in BLOCKED_HOSTS:
             return False
         try:
             addr = ipaddress.ip_address(host)
+            # Loopback (127.0.0.1), private IPs (10.x, 192.168.x) und Link-Local blocken
             if addr.is_loopback or addr.is_private or addr.is_link_local:
                 return False
         except ValueError:
-            pass
+            pass  # Hostname (keine IP), kommt durch
         return True
     except Exception:
         return False
@@ -425,6 +462,7 @@ async def setup(
     grocy_key: str = Form(""),
     lang: str = Form("de"),
 ):
+    """Erstkonfiguration: Passwort, BAP-/Grocy-Zugangsdaten und Sprache speichern."""
     if config.get("setup_complete", False):
         return RedirectResponse("/", status_code=303)
     if grocy_url and not _validate_url(grocy_url):
@@ -457,6 +495,7 @@ async def setup(
 # ─── API: Listen ────────────────────────────────────────────────
 
 def _ensure_bap_client() -> Optional[BuyMeAPieClient]:
+    """BAP-Client zurückgeben oder neu initialisieren, falls noch nicht verbunden."""
     if shopping_manager._bap:
         return shopping_manager._bap
     bap_user = config.get_decrypted("bap_user", "")
@@ -470,6 +509,7 @@ def _ensure_bap_client() -> Optional[BuyMeAPieClient]:
 
 @app.get("/api/lists", tags=["Items"])
 async def api_lists(_: bool = Depends(verify_token)):
+    """Alle BAP-Einkaufslisten mit Artikelanzahl und Sync-Statistiken abrufen."""
     synced_count = 0
     try:
         synced_count = len([i for i in shopping_sync._synced_items if not i.get("purchased")])
@@ -506,6 +546,7 @@ async def api_lists(_: bool = Depends(verify_token)):
 
 @app.get("/api/lists/{list_id}/items", tags=["Items"])
 async def api_list_items(list_id: str, _: bool = Depends(verify_token)):
+    """Alle aktiven Artikel einer bestimmten BAP-Liste abrufen."""
     try:
         client = _ensure_bap_client()
         if not client:
@@ -541,6 +582,7 @@ SHARE_TOKENS_FILE = BASE_DIR / "data" / "share_tokens.json"
 
 
 def _load_share_tokens() -> dict:
+    """Freigabe-Tokens aus der verschlüsselten JSON-Datei laden, abgelaufene entfernen."""
     try:
         raw = SHARE_TOKENS_FILE.read_text()
     except FileNotFoundError:
@@ -567,10 +609,12 @@ def _load_share_tokens() -> dict:
 
 
 def _save_share_tokens(tokens: dict):
+    """Freigabe-Tokens verschlüsselt auf Disk persistieren."""
     SHARE_TOKENS_FILE.write_text(encrypt(json.dumps(tokens, indent=2)))
 
 
 def _create_share_token(name: str = "") -> dict:
+    """Neuen Freigabe-Token mit 30 Tagen Gültigkeit erstellen."""
     tokens = _load_share_tokens()
     token = secrets.token_urlsafe(32)
     uid = secrets.token_urlsafe(8)
@@ -589,6 +633,7 @@ def _create_share_token(name: str = "") -> dict:
 
 @app.post("/api/share/create", tags=["Share"])
 async def api_share_create(request: Request, _: bool = Depends(verify_token)):
+    """Neuen Freigabe-Link erstellen (30 Tage gültig) und die URL zurückgeben."""
     body = await parse_json_body(request)
     name = body.get("name", "")
     result = _create_share_token(name)
@@ -599,6 +644,7 @@ async def api_share_create(request: Request, _: bool = Depends(verify_token)):
 
 @app.post("/api/share/revoke", tags=["Share"])
 async def api_share_revoke(request: Request, _: bool = Depends(verify_token)):
+    """Freigabe-Token per UID deaktivieren (widerrufen)."""
     body = await parse_json_body(request)
     uid = body.get("uid", "")
     if not uid:
@@ -614,6 +660,7 @@ async def api_share_revoke(request: Request, _: bool = Depends(verify_token)):
 
 @app.get("/api/share/tokens", tags=["Share"])
 async def api_share_tokens(_: bool = Depends(verify_token)):
+    """Alle aktiven Freigabe-Tokens auflisten (ohne die Tokens selbst)."""
     tokens = _load_share_tokens()
     result = [{"uid": v.get("uid", ""), "name": v.get("name", ""),
                "created_at": v.get("created_at", ""), "active": v.get("active", True)}
@@ -623,6 +670,7 @@ async def api_share_tokens(_: bool = Depends(verify_token)):
 
 @app.get("/api/share/{token}/items", tags=["Share"])
 async def api_share_items(token: str):
+    """Öffentlicher Endpunkt: Aktive Einkaufslisten-Items über einen Freigabe-Link abrufen (kein Auth nötig)."""
     tokens = _load_share_tokens()
     td = tokens.get(token)
     if not td or not td.get("active"):
@@ -647,6 +695,7 @@ async def api_share_items(token: str):
 
 @app.post("/api/items/add", tags=["Items"])
 async def api_add_item(request: Request, _: bool = Depends(verify_token)):
+    """Neuen Artikel zur Einkaufsliste hinzufügen. Validiert Name (max. 200) und Menge (1-999)."""
     body = await parse_json_body(request)
     name = body.get("name", "").strip()
     quantity = body.get("quantity", 1)
@@ -674,6 +723,7 @@ async def api_add_item(request: Request, _: bool = Depends(verify_token)):
 
 @app.post("/api/items/add-bulk", tags=["Items"])
 async def api_add_items_bulk(request: Request, _: bool = Depends(verify_token)):
+    """Mehrere Artikel auf einmal hinzufügen (max. 100). Akzeptiert JSON-Array oder Zeilenumbrüche."""
     body = await parse_json_body(request)
     items_text = body.get("items", "")
 
@@ -718,6 +768,7 @@ async def api_add_items_bulk(request: Request, _: bool = Depends(verify_token)):
 
 @app.post("/api/items/{item_name}/remove", tags=["Items"])
 async def api_remove_item(item_name: str, _: bool = Depends(verify_token)):
+    """Einzelnen Artikel aus der Liste entfernen (in den Papierkorb verschieben)."""
     result = await shopping_sync.remove_item(item_name)
     logger.info(f"Entfernt: {item_name}")
     asyncio.create_task(_propagate_remove(item_name))
@@ -727,12 +778,14 @@ async def api_remove_item(item_name: str, _: bool = Depends(verify_token)):
 
 @app.get("/api/trash/items", tags=["Trash"])
 async def api_trash_items(_: bool = Depends(verify_token)):
+    """Papierkorb-Inhalte abrufen (gelöschte, noch nicht endgültig entfernte Artikel)."""
     items = shopping_sync.get_trash()
     return JSONResponse({"items": items, "count": len(items)})
 
 
 @app.post("/api/trash/restore/{item_name}", tags=["Trash"])
 async def api_trash_restore(item_name: str, _: bool = Depends(verify_token)):
+    """Gelöschten Artikel aus dem Papierkorb zurück in die Liste holen."""
     result = await shopping_sync.restore_item(item_name)
     logger.info(f"Wiederhergestellt: {item_name}")
     await broadcast_items_updated()
@@ -741,6 +794,7 @@ async def api_trash_restore(item_name: str, _: bool = Depends(verify_token)):
 
 @app.post("/api/trash/empty", tags=["Trash"])
 async def api_trash_empty(_: bool = Depends(verify_token)):
+    """Papierkorb endgültig leeren (nicht wiederherstellbar)."""
     bap_client = shopping_manager._bap
     grocy_client = shopping_manager._grocy if shopping_manager._grocy else None
     result = await shopping_sync.empty_trash(bap_client=bap_client, grocy_client=grocy_client)
@@ -751,6 +805,7 @@ async def api_trash_empty(_: bool = Depends(verify_token)):
 
 @app.post("/api/items/{item_name}/purchased", tags=["Items"])
 async def api_mark_purchased(item_name: str, _: bool = Depends(verify_token)):
+    """Artikel als gekauft markieren (entfernt ihn aus der aktiven Liste)."""
     logger.info(f"Kauf-Anfrage für '{item_name}'")
     result = await shopping_sync.mark_purchased(item_name)
     logger.info(f"Erledigt: {item_name} → {result}")
@@ -761,6 +816,7 @@ async def api_mark_purchased(item_name: str, _: bool = Depends(verify_token)):
 
 @app.post("/api/items/{item_name}/quantity", tags=["Items"])
 async def api_update_quantity(item_name: str, request: Request, _: bool = Depends(verify_token)):
+    """Menge eines Artikels ändern (1-999) und Grocy-Listen-Eintrag synchron halten."""
     body = await parse_json_body(request)
     quantity = body.get("quantity", 1)
     if not isinstance(quantity, int) or quantity < 1 or quantity > 999:
@@ -790,6 +846,7 @@ async def api_update_quantity(item_name: str, request: Request, _: bool = Depend
 
 @app.post("/api/items/clear-purchased", tags=["Items"])
 async def api_clear_purchased(_: bool = Depends(verify_token)):
+    """Alle als gekauft markierten Artikel auf einmal aus der Liste entfernen."""
     result = await shopping_sync.clear_purchased()
     logger.info(f"Gekaufte Artikel bereinigt: {result}")
     await broadcast_items_updated()
@@ -798,6 +855,7 @@ async def api_clear_purchased(_: bool = Depends(verify_token)):
 
 @app.post("/api/items/batch-purchased", tags=["Items"])
 async def api_batch_purchased(request: Request, _: bool = Depends(verify_token)):
+    """Mehrere Artikel gleichzeitig als gekauft markieren (Batch-Operation)."""
     body = await parse_json_body(request)
     names = body.get("names", [])
     if not names:
@@ -812,6 +870,7 @@ async def api_batch_purchased(request: Request, _: bool = Depends(verify_token))
 
 @app.post("/api/items/batch-remove", tags=["Items"])
 async def api_batch_remove(request: Request, _: bool = Depends(verify_token)):
+    """Mehrere Artikel gleichzeitig aus der Liste entfernen (Batch-Operation)."""
     body = await parse_json_body(request)
     names = body.get("names", [])
     if not names:
@@ -828,6 +887,7 @@ async def api_batch_remove(request: Request, _: bool = Depends(verify_token)):
 
 @app.get("/api/sync/push", tags=["Sync"])
 async def api_sync_push(_: bool = Depends(verify_token)):
+    """Lokale Liste an Buy Me a Pie pushen (Einweg-Sync: lokal → BAP)."""
     try:
         client = shopping_manager._bap
         if not client:
@@ -843,6 +903,7 @@ async def api_sync_push(_: bool = Depends(verify_token)):
 
 @app.get("/api/sync/pull", tags=["Sync"])
 async def api_sync_pull(_: bool = Depends(verify_token)):
+    """Gekaufte Artikel von Buy Me a Pie abrufen (Einweg-Sync: BAP → lokal)."""
     try:
         client = shopping_manager._bap
         if not client:
@@ -859,10 +920,12 @@ async def api_sync_pull(_: bool = Depends(verify_token)):
 
 @app.get("/api/sync/full", tags=["Sync"])
 async def api_sync_full(_: bool = Depends(verify_token)):
+    """Vollständiger bidirektionaler Sync zwischen BAP, Grocy und lokaler Liste."""
     try:
         bap_client = shopping_manager._bap
         grocy = shopping_manager._grocy
 
+        # Bidirektionaler Sync wenn beide Quellen verfügbar, sonst Einweg
         if bap_client and grocy:
             result = await shopping_sync.sync_full(grocy, bap_client)
         elif bap_client:
@@ -882,6 +945,7 @@ async def api_sync_full(_: bool = Depends(verify_token)):
 
 @app.get("/api/sync/grocy", tags=["Sync"])
 async def api_sync_grocy(_: bool = Depends(verify_token)):
+    """Rohdaten der Grocy-Einkaufsliste abrufen (Name, Menge, ID)."""
     grocy = shopping_manager._grocy
     if not grocy:
         return JSONResponse({"result": "Keine Grocy-Verbindung", "items": []})
@@ -896,6 +960,7 @@ async def api_sync_grocy(_: bool = Depends(verify_token)):
 
 @app.get("/api/sync/grocy/push", tags=["Sync"])
 async def api_sync_grocy_push(_: bool = Depends(verify_token)):
+    """Lokale Einkaufsliste nach Grocy übertragen (lokal → Grocy)."""
     grocy = shopping_manager._grocy
     if not grocy:
         return JSONResponse({"result": "Keine Grocy-Verbindung"})
@@ -911,6 +976,7 @@ async def api_sync_grocy_push(_: bool = Depends(verify_token)):
 
 @app.get("/api/sync/grocy/pull", tags=["Sync"])
 async def api_sync_grocy_pull(_: bool = Depends(verify_token)):
+    """Grocy-Artikel in die lokale Liste importieren (Grocy → lokal)."""
     grocy = shopping_manager._grocy
     if not grocy:
         return JSONResponse({"result": "Keine Grocy-Verbindung"})
@@ -937,11 +1003,14 @@ async def api_sync_grocy_pull(_: bool = Depends(verify_token)):
 
 @app.get("/api/synced", tags=["Sync"])
 async def api_synced(_: bool = Depends(verify_token)):
+    """Zusammengeführte Text-Ansicht der gesamten Sync-Liste abrufen."""
     return JSONResponse({"text": shopping_sync.get_merged_text()})
 
 
 @app.get("/api/synced/items", tags=["Sync"])
 async def api_synced_items(_: bool = Depends(verify_token)):
+    """Synced-Items mit Kategoriesortierung und optionalem Grocy-Bestand abrufen."""
+    # Initialen Sync anstoßen, falls die Liste noch leer ist
     if not shopping_sync._synced_items and (shopping_manager._bap or shopping_manager._grocy):
         logger.info("Synced-Liste leer → initialer Auto-Sync")
         try:
@@ -949,9 +1018,11 @@ async def api_synced_items(_: bool = Depends(verify_token)):
         except Exception as e:
             logger.error(f"Initialer Sync fehlgeschlagen: {e}")
     all_items = shopping_sync._synced_items[:]
+    # Aktive und gekaufte Items trennen
     active = [i for i in all_items if not i.get("purchased")]
     purchased = [i for i in all_items if i.get("purchased")]
 
+    # Grocy-Bestand je Produkt abrufen
     stock_map = {}
     if shopping_manager._grocy:
         try:
@@ -959,11 +1030,13 @@ async def api_synced_items(_: bool = Depends(verify_token)):
         except Exception as e:
             logger.debug(f"Stock-Fehler: {e}")
 
+    # Bestandsinformation an die aktiven Items anhängen
     for item in active:
         nn = shopping_sync._norm(item.get("name", ""))
         if nn in stock_map:
             item["stock"] = stock_map[nn]
 
+    # Items nach Kategorie gruppieren
     by_category = {}
     for item in active:
         cat = item.get("category", "") or "Sonstiges"
@@ -981,6 +1054,7 @@ async def api_synced_items(_: bool = Depends(verify_token)):
 
 @app.post("/api/synced/reset", tags=["Sync"])
 async def api_synced_reset(_: bool = Depends(verify_token)):
+    """Komplette Sync-Liste zurücksetzen: Backup anlegen, leeren, neu synchronisieren."""
     backup_path = shopping_sync.backup()
     shopping_sync._synced_items = []
     shopping_sync._removed = []
@@ -997,19 +1071,21 @@ async def api_synced_reset(_: bool = Depends(verify_token)):
 
 @app.get("/api/export")
 async def api_export(_: bool = Depends(verify_token)):
+    """Synced-Liste als BAP-kompatibles Format exportieren."""
     export = shopping_sync.export_for_buymeapie()
     return JSONResponse({"export": export, "count": len(export.splitlines()) if export else 0})
 
 
 @app.get("/api/suggestions")
 async def api_suggestions(q: str = "", _: bool = Depends(verify_token)):
+    """Auto-Vervollständigungsvorschläge aus bestehenden Items + Grocy-Produkten (max. 15)."""
     suggestions = set()
     ql = q.lower().strip()
-    # Existing synced items
+    # Vorschläge aus der aktuellen Sync-Liste (ungekaufte Items)
     for item in shopping_sync._synced_items:
         if not item.get("purchased") and (not ql or ql in item.get("name", "").lower()):
             suggestions.add(item["name"])
-    # Grocy product names
+    # Zusätzliche Vorschläge aus den Grocy-Produktnamen
     if shopping_manager._grocy:
         try:
             products = shopping_manager._grocy._get("objects/products")
@@ -1026,6 +1102,7 @@ async def api_suggestions(q: str = "", _: bool = Depends(verify_token)):
 
 @app.get("/api/categories")
 async def api_categories(_: bool = Depends(verify_token)):
+    """Vordefinierte Kategorien für die Einkaufsliste abrufen."""
     return JSONResponse({"categories": DEFAULT_CATEGORIES})
 
 
@@ -1033,6 +1110,7 @@ async def api_categories(_: bool = Depends(verify_token)):
 
 @app.get("/api/config", tags=["Config"])
 async def api_config_get(_: bool = Depends(verify_token)):
+    """Aktuelle Konfigurationseinstellungen abrufen (unsensible Werte)."""
     return JSONResponse({
         "bap_user": config.get_decrypted("bap_user", ""),
         "bap_list_name": config.get("bap_list_name", "Einkaufsliste"),
@@ -1044,6 +1122,7 @@ async def api_config_get(_: bool = Depends(verify_token)):
 
 @app.post("/api/config/bap", tags=["Config"])
 async def api_config_bap(request: Request, _: bool = Depends(verify_token)):
+    """Buy Me a Pie-Zugangsdaten aktualisieren und Client neu verbinden."""
     body = await parse_json_body(request)
     bap_user = body.get("bap_user", "")
     bap_pass = body.get("bap_pass", "")
@@ -1061,12 +1140,14 @@ async def api_config_bap(request: Request, _: bool = Depends(verify_token)):
 
 @app.get("/api/config/sync-interval", tags=["Config"])
 async def api_get_sync_interval(_: bool = Depends(verify_token)):
+    """Aktuelles Auto-Sync-Intervall in Minuten abrufen."""
     interval = config.get("sync_interval", 5)
     return JSONResponse({"interval": interval})
 
 
 @app.post("/api/config/sync-interval", tags=["Config"])
 async def api_set_sync_interval(request: Request, _: bool = Depends(verify_token)):
+    """Auto-Sync-Intervall setzen (in Minuten, 0 deaktiviert Auto-Sync)."""
     body = await parse_json_body(request)
     interval = body.get("interval", 5)
     if not isinstance(interval, (int, float)) or interval < 0:
@@ -1082,12 +1163,14 @@ async def api_set_sync_interval(request: Request, _: bool = Depends(verify_token
 
 @app.get("/api/config/lang", tags=["Config"])
 async def api_get_lang(_: bool = Depends(verify_token)):
+    """Aktuelle Sprache und verfügbare Sprachen abrufen."""
     lang = config.get("lang", "de")
     return JSONResponse({"lang": lang, "available": AVAILABLE_LANGUAGES})
 
 
 @app.post("/api/config/lang", tags=["Config"])
 async def api_set_lang(request: Request, _: bool = Depends(verify_token)):
+    """Sprache der Benutzeroberfläche ändern und i18n neu laden."""
     body = await parse_json_body(request)
     lang = body.get("lang", "de")
     if lang not in AVAILABLE_LANGUAGES:
@@ -1099,6 +1182,7 @@ async def api_set_lang(request: Request, _: bool = Depends(verify_token)):
 
 @app.get("/api/config/export", tags=["Config"])
 async def api_config_export(_: bool = Depends(verify_token)):
+    """Konfiguration exportieren (sensible Felder werden mit *** unkenntlich gemacht)."""
     REDACTED = "***"
     safe_config = {}
     redacted_keys = {"auth_token", "grocy_key", "grocy_url", "bap_pass", "password", "ai_api_key", "imap_pass", "smtp_pass", "caldav_pass"}
@@ -1117,10 +1201,12 @@ async def api_config_export(_: bool = Depends(verify_token)):
 
 @app.post("/api/config/import", tags=["Config"])
 async def api_config_import(request: Request, _: bool = Depends(verify_token)):
+    """Konfiguration importieren (Credentials werden blockiert — können nicht überschrieben werden)."""
     body = await parse_json_body(request)
     config_data = body.get("config", {})
 
     if isinstance(config_data, dict):
+        # Sicherheitskritische Keys dürfen nicht überschrieben werden
         blocked_keys = {"secret_key", "auth_token", "auth_token_created_at",
                         "password", "bap_user", "bap_pass", "grocy_url", "grocy_key"}
         for k in blocked_keys:
@@ -1135,11 +1221,13 @@ async def api_config_import(request: Request, _: bool = Depends(verify_token)):
 
 @app.get("/health", tags=["System"])
 async def health():
+    """Einfacher Health-Check-Ping (ohne Auth, für Monitoring-Tools)."""
     return {"status": "ok", "service": "grot2buy"}
 
 
 @app.get("/api/system/status", tags=["System"])
 async def api_system_status(_: bool = Depends(verify_token)):
+    """Server-Status mit Version, Backend-Typ und Zeitstempel abrufen."""
     return JSONResponse({
         "status": "running",
         "version": VERSION,
@@ -1153,6 +1241,8 @@ async def api_system_status(_: bool = Depends(verify_token)):
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    """WebSocket-Endpunkt für Live-Updates. Clients erhalten Sync-Benachrichtigungen und können Sync anstoßen."""
+    # Origin-Validierung gegen CSWSH (Cross-Site WebSocket Hijacking)
     origin = websocket.headers.get("origin", "")
     if origin:
         from urllib.parse import urlparse
@@ -1175,6 +1265,7 @@ async def websocket_endpoint(websocket: WebSocket):
         except Exception:
             await websocket.close(code=1008)
             return
+    # Authentifizierung via Cookie-Token, falls ein Passwort gesetzt ist
     has_password = bool(config.get_decrypted("password", ""))
     if has_password:
         token = websocket.cookies.get("auth_token", "")
@@ -1216,22 +1307,27 @@ def _md_to_html(md: str) -> str:
     in_list = False
 
     def flush():
+        """Offene List-Tags schließen."""
         nonlocal in_list
         if in_list:
             html.append('</ul>\n')
             in_list = False
 
     def esc(s):
+        """HTML-Sonderzeichen escapen (XSS-Schutz)."""
         return s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
 
     def inline(s):
+        """Inline-Markdown-Elemente (fett, code) in HTML umwandeln."""
         s = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', s)
         s = re.sub(r'`(.+?)`', r'<code>\1</code>', s)
         return s
 
     for line in lines:
+        # Code-Block umschalten (```)
         if line.startswith('```'):
             if in_code:
+                # Code-Block schließen
                 html.append('<pre><code>' + esc('\n'.join(code_buf)) + '</code></pre>\n')
                 code_buf = []
                 in_code = False
@@ -1242,27 +1338,34 @@ def _md_to_html(md: str) -> str:
             code_buf.append(line)
             continue
 
+        # Überschriften
         if line.startswith('### '):
             flush(); html.append('<h3>' + inline(esc(line[4:])) + '</h3>\n')
         elif line.startswith('## '):
             flush(); html.append('<h2>' + inline(esc(line[3:])) + '</h2>\n')
         elif line.startswith('# '):
             flush(); html.append('<h1>' + inline(esc(line[2:])) + '</h1>\n')
+        # Ungeordnete Listen
         elif line.startswith('- ') or line.startswith('* '):
             if not in_list:
                 html.append('<ul>\n'); in_list = True
             html.append('<li>' + inline(esc(line[2:])) + '</li>\n')
+        # Nummerierte Listen
         elif re.match(r'^\d+\.\s', line):
             if not in_list:
                 html.append('<ol>\n'); in_list = 'ol'
             html.append('<li>' + inline(esc(re.sub(r'^\d+\.\s', '', line))) + '</li>\n')
+        # Leerzeilen trennen Absätze
         elif line.strip() == '':
             flush()
+        # Horizontale Trennlinie
         elif line.startswith('---'):
             flush(); html.append('<hr>\n')
+        # Normale Absätze
         else:
             flush(); html.append('<p>' + inline(esc(line)) + '</p>\n')
 
+    # Übrig gebliebene Code/List-Blöcke schließen
     if in_code:
         html.append('<pre><code>' + esc('\n'.join(code_buf)) + '</code></pre>\n')
     if in_list:
@@ -1272,6 +1375,7 @@ def _md_to_html(md: str) -> str:
 
 @app.get("/api/docs/doku", tags=["Docs"])
 async def get_doku(_: bool = Depends(verify_token)):
+    """DOKU.md als HTML ausliefern (Server-seitig gerendert)."""
     try:
         with open("DOKU.md", "r", encoding="utf-8") as f:
             content = f.read()
@@ -1282,6 +1386,7 @@ async def get_doku(_: bool = Depends(verify_token)):
 
 @app.get("/api/docs/changelog", tags=["Docs"])
 async def get_changelog(_: bool = Depends(verify_token)):
+    """CHANGELOG.md als HTML ausliefern (Server-seitig gerendert)."""
     try:
         with open("CHANGELOG.md", "r", encoding="utf-8") as f:
             content = f.read()
@@ -1312,10 +1417,11 @@ _LOG_SANITIZE_PATTERNS = [
 
 @app.get("/api/logs", tags=["Docs"])
 async def get_logs(lines: int = 200, _: bool = Depends(verify_token)):
-    """Gibt die letzten N Zeilen des Logs zurück (gesäubert)."""
+    """Gibt die letzten N Zeilen des Logs zurück (gesäubert — Credentials/Tokens werden entfernt)."""
     max_lines = min(max(lines, 10), 500)
     raw = _read_last_n_lines(str(LOG_FILE), max_lines)
     sanitized = raw
+    # Alle bekannten Credential-Muster aus den Logs entfernen
     for pattern, replacement in _LOG_SANITIZE_PATTERNS:
         sanitized = pattern.sub(replacement, sanitized)
     return {"logs": sanitized, "lines": max_lines}
