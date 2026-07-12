@@ -11,15 +11,17 @@ import secrets
 import hashlib
 import logging
 import asyncio
+import time
 from json import JSONDecodeError
 from pathlib import Path
 from typing import Optional
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+import uuid
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-VERSION = "0.13.0"
+VERSION = "0.15.0"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -36,7 +38,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from modules.config import config
+from modules.config import config, encrypt, decrypt
 from modules.shopping import shopping_manager
 from modules.shopping_sync import shopping_sync
 from modules.buymeapie import BuyMeAPieClient
@@ -107,12 +109,11 @@ async def parse_json_body(request: Request) -> dict:
         raise HTTPException(status_code=400, detail="Ungültiges JSON-Format")
 
 
-def _set_auth_cookie(response, token: str):
-    is_https = config.get("server_port", 8899) == 443
+def _set_auth_cookie(response, token: str, secure: bool = False):
     response.set_cookie(
         "auth_token", token,
         httponly=True,
-        secure=is_https,
+        secure=secure,
         samesite="lax",
         max_age=86400 * 30
     )
@@ -162,6 +163,30 @@ async def broadcast_items_updated():
     await ws_manager.broadcast({"type": "items_updated"})
 
 
+async def _propagate_add(name: str, quantity: int = 1):
+    loop = asyncio.get_event_loop()
+    try:
+        await loop.run_in_executor(None, shopping_sync.propagate_add, name, quantity)
+    except Exception as e:
+        logger.warning(f"Background propagate_add fehlgeschlagen: {e}")
+
+
+async def _propagate_remove(name: str):
+    loop = asyncio.get_event_loop()
+    try:
+        await loop.run_in_executor(None, shopping_sync.propagate_remove, name)
+    except Exception as e:
+        logger.warning(f"Background propagate_remove fehlgeschlagen: {e}")
+
+
+async def _propagate_mark_purchased(name: str):
+    loop = asyncio.get_event_loop()
+    try:
+        await loop.run_in_executor(None, shopping_sync.propagate_mark_purchased, name)
+    except Exception as e:
+        logger.warning(f"Background propagate_mark_purchased fehlgeschlagen: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Grot2Buy startet...")
@@ -169,7 +194,7 @@ async def lifespan(app: FastAPI):
     bap_pass = config.get_decrypted("bap_pass", "")
     if bap_user and bap_pass:
         shopping_manager.configure_buymeapie(bap_user, bap_pass)
-        logger.info(f"Buy Me a Pie verbunden als {bap_user}")
+        logger.info("Buy Me a Pie verbunden")
     else:
         logger.info("Keine BAP-Zugangsdaten — lokaler Modus")
     grocy_url = config.get_decrypted("grocy_url", "") or config.get("grocy_url", "")
@@ -177,11 +202,12 @@ async def lifespan(app: FastAPI):
     if grocy_url and grocy_key:
         result = shopping_manager.configure_grocy(grocy_url, grocy_key)
         if result:
-            logger.info(f"Grocy verbunden: {grocy_url}")
+            logger.info("Grocy verbunden")
         else:
-            logger.warning(f"Grocy Verbindung fehlgeschlagen: {grocy_url}")
+            logger.warning("Grocy Verbindung fehlgeschlagen")
     else:
         logger.info("Keine Grocy-Zugangsdaten")
+    shopping_sync.link_clients(bap=shopping_manager._bap, grocy=shopping_manager._grocy)
     sync_task = asyncio.create_task(_background_sync())
     yield
     sync_task.cancel()
@@ -266,6 +292,10 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         response.headers["Content-Security-Policy"] = "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' ws:; img-src 'self' data:; font-src 'self'"
+        if request.url.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
         return response
 
 
@@ -274,8 +304,8 @@ app.add_middleware(SecurityHeadersMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=[],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -305,14 +335,44 @@ async def login_page(request: Request):
     return templates.TemplateResponse(request, "login.html", template_context(request))
 
 
+_login_attempts: dict[str, list[float]] = {}
+
+def _client_ip(request: Request) -> str:
+    forwarded = request.headers.get("X-Forwarded-For", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    real_ip = request.headers.get("X-Real-IP", "")
+    if real_ip:
+        return real_ip.strip()
+    return request.client.host if request.client else "unknown"
+
+def _check_rate_limit(ip: str, max_attempts: int = 5, window: int = 300) -> bool:
+    now = time.time()
+    if len(_login_attempts) > 10000:
+        _login_attempts.clear()
+    attempts = _login_attempts.get(ip, [])
+    attempts = [t for t in attempts if now - t < window]
+    _login_attempts[ip] = attempts
+    if len(attempts) >= max_attempts:
+        return False
+    attempts.append(now)
+    return True
+
 @app.post("/login")
 async def login_submit(request: Request, password: str = Form("")):
+    client_ip = _client_ip(request)
+    if not _check_rate_limit(client_ip):
+        import asyncio
+        await asyncio.sleep(2)
+        return templates.TemplateResponse(request, "login.html", template_context(request, {
+            "error": "Zu viele Fehlversuche. Bitte warte 5 Minuten."
+        }))
     stored_pass = config.get("password", "")
     if stored_pass and verify_password(password, stored_pass):
         token = secrets.token_urlsafe(32)
         config.set_auth_token(token)
         response = RedirectResponse("/", status_code=303)
-        _set_auth_cookie(response, token)
+        _set_auth_cookie(response, token, secure=request.url.scheme == "https")
         return response
     return templates.TemplateResponse(request, "login.html", template_context(request, {
         "error": i18n_t("login.error", config.get("lang", "de"))
@@ -324,6 +384,31 @@ async def logout():
     response = RedirectResponse("/login", status_code=303)
     response.delete_cookie("auth_token")
     return response
+
+
+BLOCKED_HOSTS = {"metadata.google.internal", "metadata.lxd"}
+
+def _validate_url(url: str) -> bool:
+    from urllib.parse import urlparse
+    import ipaddress
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in {"http", "https"}:
+            return False
+        host = parsed.hostname
+        if not host:
+            return False
+        if host in BLOCKED_HOSTS:
+            return False
+        try:
+            addr = ipaddress.ip_address(host)
+            if addr.is_loopback or addr.is_private or addr.is_link_local:
+                return False
+        except ValueError:
+            pass
+        return True
+    except Exception:
+        return False
 
 
 # ─── Setup ─────────────────────────────────────────────────────
@@ -338,6 +423,12 @@ async def setup(
     grocy_key: str = Form(""),
     lang: str = Form("de"),
 ):
+    if config.get("setup_complete", False):
+        return RedirectResponse("/", status_code=303)
+    if grocy_url and not _validate_url(grocy_url):
+        return templates.TemplateResponse(request, "setup.html", template_context(request, {
+            "error": "Ungültige Grocy-URL."
+        }))
     config.set("lang", lang if lang in AVAILABLE_LANGUAGES else "de")
     config.set("password", hash_password(password) if password else "")
     config.set_encrypted("bap_user", bap_user)
@@ -352,10 +443,12 @@ async def setup(
     if grocy_url and grocy_key:
         shopping_manager.configure_grocy(grocy_url, grocy_key)
 
+    shopping_sync.link_clients(shopping_manager._bap, shopping_manager._grocy)
+
     token = secrets.token_urlsafe(32)
     config.set_auth_token(token)
     response = RedirectResponse("/", status_code=303)
-    _set_auth_cookie(response, token)
+    _set_auth_cookie(response, token, secure=request.url.scheme == "https")
     return response
 
 
@@ -368,6 +461,7 @@ def _ensure_bap_client() -> Optional[BuyMeAPieClient]:
     bap_pass = config.get_decrypted("bap_pass", "")
     if bap_user and bap_pass:
         shopping_manager.configure_buymeapie(bap_user, bap_pass)
+        shopping_sync.link_clients(shopping_manager._bap, shopping_manager._grocy)
         return shopping_manager._bap
     return None
 
@@ -439,6 +533,114 @@ async def api_list_items(list_id: str, _: bool = Depends(verify_token)):
         return JSONResponse({"items": [], "error": "Fehler beim Laden der Artikel"})
 
 
+# ─── Share-Tokens ──────────────────────────────────────────────
+
+SHARE_TOKENS_FILE = BASE_DIR / "data" / "share_tokens.json"
+
+
+def _load_share_tokens() -> dict:
+    try:
+        raw = SHARE_TOKENS_FILE.read_text()
+    except FileNotFoundError:
+        return {}
+    try:
+        if raw.startswith("gAAAAA"):
+            raw = decrypt(raw)
+        tokens = json.loads(raw)
+    except (json.JSONDecodeError, Exception):
+        return {}
+    now = datetime.now(timezone.utc)
+    changed = False
+    for k, v in list(tokens.items()):
+        if "uid" not in v:
+            v["uid"] = secrets.token_urlsafe(8)
+            changed = True
+        expires = v.get("expires_at")
+        if expires and datetime.fromisoformat(expires) < now:
+            del tokens[k]
+            changed = True
+    if changed:
+        _save_share_tokens(tokens)
+    return tokens
+
+
+def _save_share_tokens(tokens: dict):
+    SHARE_TOKENS_FILE.write_text(encrypt(json.dumps(tokens, indent=2)))
+
+
+def _create_share_token(name: str = "") -> dict:
+    tokens = _load_share_tokens()
+    token = secrets.token_urlsafe(32)
+    uid = secrets.token_urlsafe(8)
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(days=30)
+    tokens[token] = {
+        "uid": uid,
+        "name": name or f"Freigabe #{len(tokens) + 1}",
+        "created_at": now.isoformat(),
+        "expires_at": expires_at.isoformat(),
+        "active": True,
+    }
+    _save_share_tokens(tokens)
+    return {"token": token, "uid": uid, **tokens[token]}
+
+
+@app.post("/api/share/create", tags=["Share"])
+async def api_share_create(request: Request, _: bool = Depends(verify_token)):
+    body = await parse_json_body(request)
+    name = body.get("name", "")
+    result = _create_share_token(name)
+    link = f"{request.base_url}api/share/{result['token']}/items"
+    result["link"] = link
+    return JSONResponse(result)
+
+
+@app.post("/api/share/revoke", tags=["Share"])
+async def api_share_revoke(request: Request, _: bool = Depends(verify_token)):
+    body = await parse_json_body(request)
+    uid = body.get("uid", "")
+    if not uid:
+        return JSONResponse({"error": "uid erforderlich"}, status_code=400)
+    tokens = _load_share_tokens()
+    for k, v in list(tokens.items()):
+        if v.get("uid") == uid:
+            tokens[k]["active"] = False
+            _save_share_tokens(tokens)
+            return JSONResponse({"result": "Token deaktiviert."})
+    return JSONResponse({"result": "Token nicht gefunden."}, status_code=404)
+
+
+@app.get("/api/share/tokens", tags=["Share"])
+async def api_share_tokens(_: bool = Depends(verify_token)):
+    tokens = _load_share_tokens()
+    result = [{"uid": v.get("uid", ""), "name": v.get("name", ""),
+               "created_at": v.get("created_at", ""), "active": v.get("active", True)}
+              for k, v in tokens.items()]
+    return JSONResponse({"tokens": result})
+
+
+@app.get("/api/share/{token}/items", tags=["Share"])
+async def api_share_items(token: str):
+    tokens = _load_share_tokens()
+    td = tokens.get(token)
+    if not td or not td.get("active"):
+        return JSONResponse({"error": "Ungültiger oder deaktivierter Freigabe-Link."}, status_code=404)
+    expires = td.get("expires_at")
+    if expires and datetime.fromisoformat(expires) < datetime.now(timezone.utc):
+        td["active"] = False
+        _save_share_tokens(tokens)
+        return JSONResponse({"error": "Freigabe-Link ist abgelaufen."}, status_code=410)
+    items = [
+        {"name": i.get("name", ""), "quantity": i.get("quantity", 1), "category": i.get("category", "")}
+        for i in shopping_sync._synced_items if not i.get("purchased")
+    ]
+    return JSONResponse({
+        "items": items,
+        "count": len(items),
+        "shared_by": "Grot2Buy",
+    })
+
+
 # ─── API: Artikel verwalten ────────────────────────────────────
 
 @app.post("/api/items/add", tags=["Items"])
@@ -450,9 +652,14 @@ async def api_add_item(request: Request, _: bool = Depends(verify_token)):
 
     if not name:
         return JSONResponse({"error": "Name erforderlich"}, status_code=400)
+    if len(name) > 200:
+        return JSONResponse({"error": "Name zu lang (max. 200 Zeichen)"}, status_code=400)
+    if not isinstance(quantity, int) or quantity < 1 or quantity > 999:
+        return JSONResponse({"error": "Ungültige Menge (1-999)"}, status_code=400)
 
     result = await shopping_sync.add_item(name, quantity, category)
     logger.info(f"Hinzugefügt: {name} (x{quantity}, {category})")
+    asyncio.create_task(_propagate_add(name, quantity))
     await broadcast_items_updated()
 
     return JSONResponse({
@@ -478,6 +685,9 @@ async def api_add_items_bulk(request: Request, _: bool = Depends(verify_token)):
     else:
         return JSONResponse({"error": "Ungültiges Format"}, status_code=400)
 
+    if len(lines) > 100:
+        return JSONResponse({"error": "Maximal 100 Artikel auf einmal erlaubt"}, status_code=400)
+
     for line in lines:
         name = line
         if isinstance(line, dict):
@@ -492,6 +702,7 @@ async def api_add_items_bulk(request: Request, _: bool = Depends(verify_token)):
         result = await shopping_sync.add_item(name, qty, "")
         if "hinzugefügt" in result or "aktualisiert" in result:
             added += 1
+            asyncio.create_task(_propagate_add(name, qty))
         else:
             skipped += 1
 
@@ -505,10 +716,9 @@ async def api_add_items_bulk(request: Request, _: bool = Depends(verify_token)):
 
 @app.post("/api/items/{item_name}/remove", tags=["Items"])
 async def api_remove_item(item_name: str, _: bool = Depends(verify_token)):
-    bap_client = shopping_manager._bap
-    grocy_client = shopping_manager._grocy if shopping_manager._grocy else None
-    result = await shopping_sync.remove_item(item_name, bap_client=bap_client, grocy_client=grocy_client)
+    result = await shopping_sync.remove_item(item_name)
     logger.info(f"Entfernt: {item_name}")
+    asyncio.create_task(_propagate_remove(item_name))
     await broadcast_items_updated()
     return JSONResponse({"result": result})
 
@@ -539,11 +749,10 @@ async def api_trash_empty(_: bool = Depends(verify_token)):
 
 @app.post("/api/items/{item_name}/purchased", tags=["Items"])
 async def api_mark_purchased(item_name: str, _: bool = Depends(verify_token)):
-    bap_client = shopping_manager._bap
-    grocy_client = shopping_manager._grocy if shopping_manager._grocy else None
     logger.info(f"Kauf-Anfrage für '{item_name}'")
-    result = await shopping_sync.mark_purchased(item_name, bap_client=bap_client, grocy_client=grocy_client)
+    result = await shopping_sync.mark_purchased(item_name)
     logger.info(f"Erledigt: {item_name} → {result}")
+    asyncio.create_task(_propagate_mark_purchased(item_name))
     await broadcast_items_updated()
     return JSONResponse({"result": result})
 
@@ -552,6 +761,8 @@ async def api_mark_purchased(item_name: str, _: bool = Depends(verify_token)):
 async def api_update_quantity(item_name: str, request: Request, _: bool = Depends(verify_token)):
     body = await parse_json_body(request)
     quantity = body.get("quantity", 1)
+    if not isinstance(quantity, int) or quantity < 1 or quantity > 999:
+        return JSONResponse({"error": "Ungültige Menge (1-999)"}, status_code=400)
     await shopping_sync.update_quantity(item_name, quantity)
 
     if shopping_manager._grocy:
@@ -579,6 +790,34 @@ async def api_update_quantity(item_name: str, request: Request, _: bool = Depend
 async def api_clear_purchased(_: bool = Depends(verify_token)):
     result = await shopping_sync.clear_purchased()
     logger.info(f"Gekaufte Artikel bereinigt: {result}")
+    await broadcast_items_updated()
+    return JSONResponse({"result": result})
+
+
+@app.post("/api/items/batch-purchased", tags=["Items"])
+async def api_batch_purchased(request: Request, _: bool = Depends(verify_token)):
+    body = await parse_json_body(request)
+    names = body.get("names", [])
+    if not names:
+        return JSONResponse({"result": "Keine Artikel ausgewählt."})
+    result = await shopping_sync.batch_mark_purchased(names)
+    logger.info(f"Batch gekauft ({len(names)}): {result}")
+    for n in names:
+        asyncio.create_task(_propagate_mark_purchased(n))
+    await broadcast_items_updated()
+    return JSONResponse({"result": result})
+
+
+@app.post("/api/items/batch-remove", tags=["Items"])
+async def api_batch_remove(request: Request, _: bool = Depends(verify_token)):
+    body = await parse_json_body(request)
+    names = body.get("names", [])
+    if not names:
+        return JSONResponse({"result": "Keine Artikel ausgewählt."})
+    result = await shopping_sync.batch_remove(names)
+    logger.info(f"Batch entfernt ({len(names)}): {result}")
+    for n in names:
+        asyncio.create_task(_propagate_remove(n))
     await broadcast_items_updated()
     return JSONResponse({"result": result})
 
@@ -740,18 +979,47 @@ async def api_synced_items(_: bool = Depends(verify_token)):
 
 @app.post("/api/synced/reset", tags=["Sync"])
 async def api_synced_reset(_: bool = Depends(verify_token)):
+    backup_path = shopping_sync.backup()
     shopping_sync._synced_items = []
     shopping_sync._removed = []
+    shopping_sync._trash = []
     shopping_sync.save()
-    result = await shopping_sync.sync_full(shopping_manager._grocy, shopping_manager._bap)
-    await broadcast_items_updated()
-    return JSONResponse({"result": result, "count": len(shopping_sync._synced_items)})
+    try:
+        result = await shopping_sync.sync_full(shopping_manager._grocy, shopping_manager._bap)
+        await broadcast_items_updated()
+        return JSONResponse({"result": result, "count": len(shopping_sync._synced_items)})
+    except Exception as e:
+        logger.error(f"Sync nach Reset fehlgeschlagen: {e}")
+        return JSONResponse({"error": f"Sync fehlgeschlagen, Backup unter {backup_path}", "backup": backup_path}, status_code=500)
 
 
 @app.get("/api/export")
 async def api_export(_: bool = Depends(verify_token)):
     export = shopping_sync.export_for_buymeapie()
     return JSONResponse({"export": export, "count": len(export.splitlines()) if export else 0})
+
+
+@app.get("/api/suggestions")
+async def api_suggestions(q: str = "", _: bool = Depends(verify_token)):
+    suggestions = set()
+    ql = q.lower().strip()
+    # Existing synced items
+    for item in shopping_sync._synced_items:
+        if not item.get("purchased") and (not ql or ql in item.get("name", "").lower()):
+            suggestions.add(item["name"])
+    # Grocy product names
+    if shopping_manager._grocy:
+        try:
+            products = shopping_manager._grocy._get("objects/products")
+            if isinstance(products, list):
+                for p in products:
+                    name = p.get("name", "")
+                    if name and (not ql or ql in name.lower()):
+                        suggestions.add(name)
+        except Exception:
+            pass
+    sorted_suggestions = sorted(suggestions, key=lambda s: (0 if s.lower().startswith(ql) else 1, s.lower()))
+    return JSONResponse({"suggestions": sorted_suggestions[:15]})
 
 
 @app.get("/api/categories")
@@ -783,6 +1051,7 @@ async def api_config_bap(request: Request, _: bool = Depends(verify_token)):
 
     if bap_user and bap_pass:
         shopping_manager.configure_buymeapie(bap_user, bap_pass)
+    shopping_sync.link_clients(shopping_manager._bap, shopping_manager._grocy)
 
     lang = config.get("lang", "de")
     return JSONResponse({"result": i18n_t("config.bap_updated", lang)})
@@ -850,7 +1119,8 @@ async def api_config_import(request: Request, _: bool = Depends(verify_token)):
     config_data = body.get("config", {})
 
     if isinstance(config_data, dict):
-        blocked_keys = {"secret_key", "auth_token", "auth_token_created_at"}
+        blocked_keys = {"secret_key", "auth_token", "auth_token_created_at",
+                        "password", "bap_user", "bap_pass", "grocy_url", "grocy_key"}
         for k in blocked_keys:
             config_data.pop(k, None)
         config._data.update(config_data)
@@ -863,7 +1133,7 @@ async def api_config_import(request: Request, _: bool = Depends(verify_token)):
 
 @app.get("/health", tags=["System"])
 async def health():
-    return {"status": "ok", "service": "grot2buy", "version": VERSION}
+    return {"status": "ok", "service": "grot2buy"}
 
 
 @app.get("/api/system/status", tags=["System"])
@@ -881,6 +1151,13 @@ async def api_system_status(_: bool = Depends(verify_token)):
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    origin = websocket.headers.get("origin", "")
+    if origin:
+        from urllib.parse import urlparse
+        o = urlparse(origin)
+        if o.hostname not in {"localhost", "127.0.0.1", "192.168.178.51", "shopping-list"}:
+            await websocket.close(code=1008)
+            return
     has_password = bool(config.get_decrypted("password", ""))
     if has_password:
         token = websocket.cookies.get("auth_token", "")
@@ -998,4 +1275,8 @@ async def get_changelog(_: bool = Depends(verify_token)):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=config.server_port)
+    cert_dir = Path(__file__).parent / "certs"
+    ssl_keyfile = str(cert_dir / "server.key") if (cert_dir / "server.key").exists() else None
+    ssl_certfile = str(cert_dir / "server.crt") if (cert_dir / "server.crt").exists() else None
+    uvicorn.run(app, host="0.0.0.0", port=config.server_port,
+                ssl_keyfile=ssl_keyfile, ssl_certfile=ssl_certfile)

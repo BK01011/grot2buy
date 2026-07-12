@@ -2,6 +2,8 @@
 const API = '/api';
 let currentTab = 'synced';
 let categories = [];
+let selectMode = false;
+let selectedItems = new Set();
 
 // Übersetzungs-Hilfe (wird aus window._t gespeist, das im Template gesetzt wird)
 function __(key, ...args) {
@@ -93,11 +95,12 @@ function connectWebSocket() {
     ws = new WebSocket(`${protocol}//${location.host}/ws`);
 
     ws.onopen = () => {
-        if (wsReconnectAttempts > 0 || !lastSyncOk) {
+        const wasReconnect = wsReconnectAttempts > 0;
+        wsReconnectAttempts = 0;
+        if (wasReconnect || !lastSyncOk) {
             loadItems();
             loadLists();
         }
-        wsReconnectAttempts = 0;
     };
 
     ws.onmessage = (event) => {
@@ -133,6 +136,19 @@ function connectWebSocket() {
         ws?.close();
     };
 }
+
+// ─── Visibility ──────────────────────────────────────────────
+
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            wsReconnectAttempts = 0;
+            connectWebSocket();
+        }
+        loadItems();
+        loadLists();
+    }
+});
 
 // ─── Init ────────────────────────────────────────────────────
 
@@ -319,15 +335,22 @@ window.addEventListener('offline', updateOfflineBadge);
 // ─── API ────────────────────────────────────────────────────
 
 async function api(path, opts = {}) {
+    const isMutation = opts.method && opts.method !== 'GET';
     try {
-        const res = await fetch(`${API}${path}`, {
+        const url = isMutation ? `${API}${path}` : `${API}${path}${path.includes('?') ? '&' : '?'}_t=${Date.now()}`;
+        const res = await fetch(url, {
             headers: { 'Content-Type': 'application/json' },
             ...opts,
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) {
+            const body = await res.text().catch(() => '');
+            const err = new Error(`HTTP ${res.status}${body ? ': ' + body.slice(0, 120) : ''}`);
+            err.status = res.status;
+            throw err;
+        }
         return await res.json();
     } catch (e) {
-        if (opts.method && opts.method !== 'GET') {
+        if (isMutation && (e.name === 'TypeError' || (e.status && e.status >= 500))) {
             addToOfflineQueue(path, opts);
             return { result: __('offline.queued'), offline: true };
         }
@@ -386,7 +409,7 @@ async function loadCategories() {
         categories = data.categories || [];
         const sel = document.getElementById('itemCategory');
         sel.innerHTML = '<option value="">' + __('add_modal.category_auto') + '</option>' +
-            categories.map(c => `<option value="${c}">${c}</option>`).join('');
+            categories.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
     } catch (e) {
         console.error('Categories load failed:', e);
     }
@@ -399,11 +422,12 @@ async function loadLists() {
         const data = await api('/lists');
         const tabs = document.getElementById('listTabs');
         const lists = data.lists || [];
+        const selectLabel = __('tab.select');
 
-        let html = '<button class="tab active" data-list="synced" onclick="switchTab(\'synced\', this)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>' + __('tab.synced') + ' (' + (data.synced_count || 0) + ')</button>';
-        html += '<button class="tab" data-list="grocy" onclick="switchTab(\'grocy\', this)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>' + __('tab.grocy') + ' (' + (data.grocy_count || 0) + ')</button>';
+        let html = '<button class="tab active" data-list="synced"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>' + __('tab.synced') + ' (' + (data.synced_count || 0) + ')</button>';
+        html += '<button class="tab" data-list="grocy"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>' + __('tab.grocy') + ' (' + (data.grocy_count || 0) + ')</button>';
         for (const list of lists) {
-            html += `<button class="tab" data-list="${list.id}" onclick="switchTab('${list.id}', this)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>${list.name} (${list.count})</button>`;
+            html += `<button class="tab" data-list="${escapeHtml(list.id)}"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>${escapeHtml(list.name)} (${list.count})</button>`;
         }
         tabs.innerHTML = html;
     } catch (e) {
@@ -411,10 +435,18 @@ async function loadLists() {
     }
 }
 
+document.addEventListener('click', function(e) {
+    const tab = e.target.closest('.tab');
+    if (tab && tab.dataset.list) {
+        switchTab(tab.dataset.list, tab);
+    }
+});
+
 function switchTab(tab, btn) {
     currentTab = tab;
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     btn.classList.add('active');
+    if (selectMode) toggleSelectMode();
     loadItems();
 }
 
@@ -437,23 +469,26 @@ async function loadItems() {
             renderBAPItems(data);
         }
     } catch (e) {
-        showOfflineFallback();
+        content.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><h3>' + __('error.load_title') + '</h3><p>'
+            + escapeHtml(e.message) + '</p></div>';
     }
 }
 
 async function showOfflineFallback() {
     const content = document.getElementById('content');
-    try {
-        const cache = await caches.open('grot2buy-v15');
-        const req = new Request('/api/synced/items');
-        const cached = await cache.match(req);
-        if (cached) {
-            const data = await cached.json();
-            renderSyncedItems(data);
-            toast(__('offline.cached'));
-            return;
-        }
-    } catch {}
+    const cacheNames = ['grot2buy-v22', 'grot2buy-v21', 'grot2buy-v20', 'grot2buy-v19', 'grot2buy-v18', 'grot2buy-v17', 'grot2buy-v16'];
+    for (const name of cacheNames) {
+        try {
+            const cache = await caches.open(name);
+            const cached = await cache.match('/api/synced/items');
+            if (cached) {
+                const data = await cached.json();
+                renderSyncedItems(data);
+                toast(__('offline.cached'));
+                return;
+            }
+        } catch {}
+    }
     content.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><h3>' + __('error.load_title') + '</h3><p>' + __('error.load_text') + '</p></div>';
 }
 
@@ -471,8 +506,26 @@ function renderSyncedItems(data) {
 
     const sortedCategories = Object.keys(byCategory).sort((a, b) => a.localeCompare(b));
 
-    content.innerHTML = `
-        <div class="item-list">
+    const selectBarHtml = selectMode
+        ? `<div class="select-bar">
+            <button class="btn btn-sm" onclick="toggleSelectMode()">${__('tab.done')}</button>
+            <button class="btn btn-sm" onclick="selectAllItems()">${__('tab.select_all')}</button>
+            <span class="batch-count" id="batchCount">${selectedItems.size}</span>
+            <button class="btn btn-sm btn-primary" onclick="batchPurchaseSelected()">${__('tab.batch_buy')}</button>
+            <button class="btn btn-sm btn-danger" onclick="batchRemoveSelected()">${__('tab.batch_delete')}</button>
+        </div>`
+        : `<div class="select-bar">
+            <button class="btn btn-sm select-toggle" onclick="toggleSelectMode()">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    <polyline points="9 11 12 14 22 4"/>
+                </svg>
+                ${__('tab.select')}
+            </button>
+        </div>`;
+
+    content.innerHTML = selectBarHtml + `
+        <div class="item-list${selectMode ? ' select-mode' : ''}">
             ${sortedCategories.map(cat => {
                 const catItems = byCategory[cat];
                 const sortedItems = catItems.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
@@ -538,10 +591,13 @@ function renderGrocyItems(data) {
 function renderItem(item) {
     const qty = item.quantity || 1;
     const stockHtml = item.stock !== undefined ? ` · ${__('item.stock', {n: item.stock})}` : '';
+    const isSelected = selectedItems.has(item.name);
+    const selectedClass = isSelected ? ' selected' : '';
     return `
-        <div class="item" data-name="${escapeHtml(item.name)}">
+        <div class="item${selectedClass}" data-name="${escapeHtml(item.name)}">
+            <div class="item-select${selectedClass}" onclick="toggleItemSelect('${escapeHtml(item.name)}', this)"></div>
             <div class="item-check ${item.purchased ? 'checked' : ''}" onclick="togglePurchased('${escapeHtml(item.name)}')"></div>
-            <div class="item-info">
+            <div class="item-info" onclick="if(selectMode) toggleItemSelect('${escapeHtml(item.name)}', null)">
                 <div class="item-name">${escapeHtml(item.name)}</div>
                 ${item.category ? `<div class="item-meta">${escapeHtml(item.category)}${stockHtml}</div>` : (stockHtml ? `<div class="item-meta">${stockHtml}</div>` : '')}
             </div>
@@ -589,6 +645,86 @@ async function removeItem(name) {
     undoToast(res.result, () => api(`/trash/restore/${encodeURIComponent(name)}`, { method: 'POST' }));
 }
 
+function toggleSelectMode() {
+    selectMode = !selectMode;
+    selectedItems.clear();
+    loadItems();
+}
+
+function toggleItemSelect(name, el) {
+    if (!selectMode) return;
+    if (selectedItems.has(name)) {
+        selectedItems.delete(name);
+    } else {
+        selectedItems.add(name);
+    }
+    updateBatchToolbar();
+    // Update visual state without full re-render
+    const items = document.querySelectorAll('.item');
+    items.forEach(item => {
+        if (item.dataset.name === name) {
+            item.classList.toggle('selected', selectedItems.has(name));
+            const cb = item.querySelector('.item-select');
+            if (cb) cb.classList.toggle('selected', selectedItems.has(name));
+        }
+    });
+}
+
+function selectAllItems() {
+    const items = document.querySelectorAll('.item[data-name]');
+    items.forEach(item => {
+        const name = item.dataset.name;
+        if (name && !item.closest('.purchased')) {
+            selectedItems.add(name);
+            item.classList.add('selected');
+            const cb = item.querySelector('.item-select');
+            if (cb) cb.classList.add('selected');
+        }
+    });
+    updateBatchToolbar();
+}
+
+function deselectAllItems() {
+    document.querySelectorAll('.item.selected').forEach(el => {
+        el.classList.remove('selected');
+    });
+    document.querySelectorAll('.item-select.selected').forEach(el => {
+        el.classList.remove('selected');
+    });
+    selectedItems.clear();
+    updateBatchToolbar();
+}
+
+function updateBatchToolbar() {
+    const count = document.getElementById('batchCount');
+    count.textContent = selectedItems.size;
+}
+
+async function batchPurchaseSelected() {
+    const names = Array.from(selectedItems);
+    if (names.length === 0) return;
+    const res = await api('/items/batch-purchased', {
+        method: 'POST',
+        body: JSON.stringify({ names }),
+    });
+    toast(res.result);
+    toggleSelectMode();
+    loadItems();
+}
+
+async function batchRemoveSelected() {
+    const names = Array.from(selectedItems);
+    if (names.length === 0) return;
+    if (!confirm(__('item.remove_confirm_batch', {n: names.length}))) return;
+    const res = await api('/items/batch-remove', {
+        method: 'POST',
+        body: JSON.stringify({ names }),
+    });
+    toast(res.result);
+    toggleSelectMode();
+    loadItems();
+}
+
 async function changeItemQty(name, delta) {
     const items = document.querySelectorAll('.item');
     let currentQty = 1;
@@ -618,7 +754,81 @@ function openAddModal() {
     document.getElementById('itemQuantity').value = '1';
     document.getElementById('itemName').focus();
     loadListOptions();
+    loadSuggestions(); // initial load for recently added items
 }
+
+async function loadSuggestions() {
+    const q = document.getElementById('itemName').value.trim();
+    if (!q) { document.getElementById('suggestionsList').innerHTML = ''; return; }
+    try {
+        const data = await api('/suggestions?q=' + encodeURIComponent(q));
+        const list = document.getElementById('suggestionsList');
+        list.innerHTML = (data.suggestions || []).map(s => `<option value="${escapeHtml(s)}">`).join('');
+    } catch (e) {}
+}
+
+const debouncedSuggestions = (() => {
+    let timer;
+    return () => {
+        clearTimeout(timer);
+        timer = setTimeout(loadSuggestions, 300);
+    };
+})();
+
+async function openShareModal() {
+    closeModal('settingsModal');
+    document.getElementById('shareModal').classList.add('open');
+    await loadShareTokens();
+}
+
+async function loadShareTokens() {
+    const section = document.getElementById('shareTokensSection');
+    const list = document.getElementById('shareTokensList');
+    try {
+        const data = await api('/share/tokens');
+        const tokens = (data.tokens || []).filter(t => t.active);
+        if (tokens.length === 0) {
+            section.style.display = 'none';
+            return;
+        }
+        section.style.display = 'block';
+        list.innerHTML = tokens.map(t => `
+            <div style="margin-bottom:12px;padding:12px;background:var(--surface-alt);border-radius:8px;word-break:break-all;font-size:0.85rem">
+                <strong>${escapeHtml(t.name)}</strong>
+                <button class="btn btn-danger" style="margin-top:4px" data-share-uid="${escapeHtml(t.uid)}">${__('share.revoke')}</button>
+            </div>
+        `).join('');
+    } catch (e) {}
+}
+
+async function createShareToken() {
+    const res = await api('/share/create', {
+        method: 'POST',
+        body: JSON.stringify({}),
+    });
+    if (res.link) {
+        try {
+            await navigator.clipboard.writeText(res.link);
+            toast(__('share.copied'));
+        } catch {
+            toast(__('share.created'));
+        }
+        await loadShareTokens();
+    }
+}
+
+async function revokeShareToken(uid) {
+    await api('/share/revoke', { method: 'POST', body: { uid } });
+    toast(__('share.revoked') || 'Token widerrufen.');
+    await loadShareTokens();
+}
+
+document.addEventListener('click', function(e) {
+    const btn = e.target.closest('[data-share-uid]');
+    if (btn) {
+        revokeShareToken(btn.dataset.shareUid);
+    }
+});
 
 async function loadListOptions() {
     const sel = document.getElementById('itemList');
@@ -626,7 +836,7 @@ async function loadListOptions() {
     try {
         const data = await api('/lists');
         for (const list of (data.lists || [])) {
-            sel.innerHTML += `<option value="${list.id}">${list.name}</option>`;
+            sel.innerHTML += `<option value="${escapeHtml(list.id)}">${escapeHtml(list.name)}</option>`;
         }
     } catch (e) {}
 }
@@ -636,20 +846,32 @@ async function addItem() {
     const quantity = parseInt(document.getElementById('itemQuantity').value) || 1;
     const category = document.getElementById('itemCategory').value;
     const listId = document.getElementById('itemList').value;
+    const btn = document.querySelector('#addModal .btn-primary');
 
     if (!name) {
         toast( __('add_modal.name_required') );
         return;
     }
 
-    const res = await api('/items/add', {
-        method: 'POST',
-        body: JSON.stringify({ name, quantity, category, list_id: listId }),
-    });
-
-    toast(res.result || res.error);
-    closeModal('addModal');
-    loadItems();
+    if (btn) btn.disabled = true;
+    try {
+        const res = await api('/items/add', {
+            method: 'POST',
+            body: JSON.stringify({ name, quantity, category, list_id: listId }),
+        });
+        toast(res.result || res.error || '✅ ' + name);
+        closeModal('addModal');
+        // Immer zur synced-Liste wechseln, damit man den neuen Artikel sieht
+        currentTab = 'synced';
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        const syncedTab = document.querySelector('.tab[data-list="synced"]');
+        if (syncedTab) syncedTab.classList.add('active');
+        loadItems();
+    } catch (e) {
+        toast('Fehler: ' + e.message);
+    } finally {
+        if (btn) btn.disabled = false;
+    }
 }
 
 function changeQuantity(delta) {
@@ -763,7 +985,7 @@ async function showTrash() {
             </div>
         `).join('');
     } catch (e) {
-        document.getElementById('trashList').innerHTML = `<p style="text-align:center;color:var(--color-danger);">${e.message}</p>`;
+        document.getElementById('trashList').innerHTML = `<p style="text-align:center;color:var(--color-danger);">${escapeHtml(e.message)}</p>`;
     }
 }
 
@@ -897,11 +1119,21 @@ async function openDocs(type) {
         const data = await api('/docs/' + type);
         if (!data || !data.html) throw new Error('empty response');
         document.getElementById('docsModalTitle').textContent = data.title || (type === 'doku' ? __('settings.docs_doku') : __('settings.docs_changelog'));
-        document.getElementById('docsBody').innerHTML = data.html;
+        const container = document.getElementById('docsBody');
+        container.textContent = '';
+        const safe = document.createElement('div');
+        safe.innerHTML = data.html;
+        safe.querySelectorAll('script, style, iframe, object, embed').forEach(el => el.remove());
+        for (const el of safe.querySelectorAll('*')) {
+            for (const attr of el.attributes) {
+                if (attr.name.startsWith('on')) el.removeAttribute(attr.name);
+            }
+        }
+        while (safe.firstChild) container.appendChild(safe.firstChild);
         document.getElementById('docsModal').classList.add('open');
     } catch (e) {
         console.error('Docs fetch error:', e);
-        toast(__('settings.error_load_docs'));
+        toast(__('settings.error_load_docs') + ' (' + e.message + ')');
     }
 }
 
@@ -912,4 +1144,9 @@ document.addEventListener('keydown', (e) => {
             addItem();
         }
     }
+});
+
+// Auto-Vervollständigung beim Tippen
+document.getElementById('itemName').addEventListener('input', () => {
+    debouncedSuggestions();
 });

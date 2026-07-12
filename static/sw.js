@@ -1,11 +1,11 @@
-const CACHE = 'grot2buy-v17';
+const CACHE = 'grot2buy-v23';
 
 const PRECACHE = [
-  '/?sw=v10',
-  '/static/style.css?v=17',
-  '/static/app.js?v=17',
-  '/static/logo.svg?v=17',
-  '/static/manifest.json?v=17',
+  '/?sw=v12',
+  '/static/style.css?v=22',
+  '/static/app.js?v=22',
+  '/static/logo.svg?v=20',
+  '/static/manifest.json?v=20',
 ];
 
 self.addEventListener('install', (event) => {
@@ -29,9 +29,6 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     fetch(event.request).then((response) => {
       if (response.ok && /\.(css|js|svg|json)$/.test(event.request.url)) {
-        caches.open(CACHE).then((cache) => cache.put(event.request, response.clone()));
-      }
-      if (response.ok && event.request.url.includes('/api/')) {
         caches.open(CACHE).then((cache) => cache.put(event.request, response.clone()));
       }
       return response;

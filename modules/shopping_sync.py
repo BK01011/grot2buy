@@ -21,6 +21,7 @@ def _utcnow() -> datetime:
 def _atomic_write(path: Path, content: str):
     tmp = path.with_suffix(".tmp")
     tmp.write_text(content, encoding="utf-8")
+    os.chmod(str(tmp), 0o600)
     tmp.replace(path)
 
 
@@ -35,6 +36,8 @@ class ShoppingSync:
         self._trash: list[dict] = []
         self._lock = asyncio.Lock()
         self._sync_running = False
+        self._linked_bap = None
+        self._linked_grocy = None
         self.load()
 
     def load(self):
@@ -82,6 +85,16 @@ class ShoppingSync:
         except Exception as e:
             logger.error(f"Sync-Datei schreiben fehlgeschlagen: {e}")
 
+    def backup(self) -> str:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_path = DATA_DIR / f"shopping_sync_backup_{ts}.json"
+        if SYNC_FILE.exists():
+            import shutil
+            shutil.copy2(SYNC_FILE, backup_path)
+            logger.info(f"Backup erstellt: {backup_path}")
+        return str(backup_path)
+
     def _norm(self, name: str) -> str:
         return name.lower().strip()
 
@@ -89,6 +102,13 @@ class ShoppingSync:
         nn = self._norm(name)
         for item in self._synced_items:
             if self._norm(item.get("name", "")) == nn:
+                return item
+        return None
+
+    def _find_active(self, name: str) -> Optional[dict]:
+        nn = self._norm(name)
+        for item in self._synced_items:
+            if not item.get("purchased") and self._norm(item.get("name", "")) == nn:
                 return item
         return None
 
@@ -102,6 +122,10 @@ class ShoppingSync:
     def release_lock(self):
         self._sync_running = False
         self._lock.release()
+
+    def link_clients(self, bap=None, grocy=None):
+        self._linked_bap = bap
+        self._linked_grocy = grocy
 
     # ─── Sync ──────────────────────────────────────────────────
 
@@ -230,10 +254,17 @@ class ShoppingSync:
                 log.append(f"  Neu in synced (Grocy done): {entry['product_name']}")
 
         # ── 5. Synced-Status aus Quellen aktualisieren ────────
+        now = _utcnow()
         for nn, item in synced_by_nn.items():
             synced_purchased = item.get("purchased", False)
             name = item["name"]
             qty = item.get("quantity", 1)
+            added_at = item.get("added_at")
+            recently_manual = (
+                item.get("source") == "manual"
+                and added_at
+                and (now - datetime.fromisoformat(added_at)).total_seconds() < 3600
+            )
 
             if nn in fresh_items:
                 desired_purchased = synced_purchased
@@ -284,17 +315,32 @@ class ShoppingSync:
                     log.append(f"  {name}: nirgends vorhanden, behalte synced ({'gekauft' if desired_purchased else 'aktiv'})")
 
             if desired_purchased != synced_purchased:
-                item["purchased"] = desired_purchased
-                item["source"] = "grocy" if grocy_changed else ("bap" if bap_changed else "sync")
-                if desired_purchased:
-                    item["purchased_at"] = now_ts
+                if recently_manual and desired_purchased:
+                    log.append(f"  {name}: kürzlich manuell hinzugefügt → aktiv behalten (nicht kaufen)")
                 else:
-                    item.pop("purchased_at", None)
+                    item["purchased"] = desired_purchased
+                    item["source"] = "grocy" if nn in grocy_done else ("bap" if nn in bap_purchased else "sync")
+                    if desired_purchased:
+                        item["purchased_at"] = now_ts
+                    else:
+                        item.pop("purchased_at", None)
 
             if nn not in fresh_items and nn in grocy_active and not nn in grocy_done:
                 item["quantity"] = grocy_active[nn].get("amount", qty)
 
-        # ── 6. Actions bauen ───────────────────────────────────
+        # ── 6. Purchased-Cleanup: älter als 30 Tage (oder ohne Datum) entfernen ──
+        cutoff = now - timedelta(days=30)
+        before = len(self._synced_items)
+        self._synced_items = [
+            i for i in self._synced_items
+            if not i.get("purchased")
+            or (i.get("purchased_at") and datetime.fromisoformat(i["purchased_at"]) > cutoff)
+        ]
+        removed_count = before - len(self._synced_items)
+        if removed_count:
+            log.append(f"  🧹 {removed_count} alte gekaufte Einträge entfernt")
+
+        # ── 7. Actions bauen ───────────────────────────────────
         actions = {"add_bap": [], "add_grocy": [],
                    "mark_purchased_bap": [], "mark_done_grocy": [],
                    "revert_grocy": [], "del_bap": [], "del_grocy_active": []}
@@ -437,7 +483,7 @@ class ShoppingSync:
                 nn = self._norm(name)
                 self._removed = [r for r in self._removed if self._norm(r) != nn]
                 self._removed_set.discard(nn)
-            existing = self._find(name)
+            existing = self._find_active(name)
             if existing:
                 existing["quantity"] = existing.get("quantity", 1) + quantity
                 self.save()
@@ -447,9 +493,27 @@ class ShoppingSync:
                 "source": source, "added_at": _utcnow().isoformat(),
             })
             self.save()
-            return f"✅ '{name}' hinzugefügt."
+        return f"✅ '{name}' hinzugefügt."
 
-    async def remove_item(self, name: str, bap_client=None, grocy_client=None) -> str:
+    def propagate_add(self, name: str, quantity: int = 1):
+        bap_client = getattr(self, '_linked_bap', None)
+        grocy_client = getattr(self, '_linked_grocy', None)
+        if bap_client:
+            try:
+                target_name = config.get("bap_list_name", "Einkaufsliste").lower()
+                for lst in bap_client.get_lists():
+                    if target_name in lst.get("name", "").lower():
+                        bap_client.add_item(lst["id"], name, quantity)
+                        break
+            except Exception as e:
+                logger.debug(f"BAP propagate_add: {e}")
+        if grocy_client:
+            try:
+                grocy_client.add_to_shopping_list(name, quantity)
+            except Exception as e:
+                logger.debug(f"Grocy propagate_add: {e}")
+
+    async def remove_item(self, name: str) -> str:
         async with self._lock:
             self._removed.append(name)
             self._removed_set.add(self._norm(name))
@@ -461,7 +525,6 @@ class ShoppingSync:
             if not item:
                 return f"❌ '{name}' nicht gefunden."
             self._synced_items = [i for i in self._synced_items if self._norm(i.get("name", "")) != self._norm(name)]
-            # In den Papierkorb verschieben
             trash_item = {
                 "name": item.get("name", name),
                 "quantity": item.get("quantity", 1),
@@ -471,6 +534,30 @@ class ShoppingSync:
             self._trash.append(trash_item)
             self.save()
         return f"✅ '{name}' in den Papierkorb verschoben."
+
+    def propagate_remove(self, name: str):
+        bap_client = getattr(self, '_linked_bap', None)
+        grocy_client = getattr(self, '_linked_grocy', None)
+        if bap_client:
+            try:
+                target_name = config.get("bap_list_name", "Einkaufsliste").lower()
+                for lst in bap_client.get_lists():
+                    if target_name in lst.get("name", "").lower():
+                        for bitem in bap_client.get_list_items(lst["id"]):
+                            if self._norm(bitem.get("title", "")) == self._norm(name) and not bitem.get("deleted"):
+                                bap_client.delete_item(lst["id"], bitem["id"])
+                                break
+                        break
+            except Exception as e:
+                logger.debug(f"BAP propagate_remove: {e}")
+        if grocy_client:
+            try:
+                for gitem in grocy_client.get_shopping_list():
+                    if self._norm(gitem.get("product", {}).get("name", "")) == self._norm(name):
+                        grocy_client.remove_from_shopping_list(gitem["id"])
+                        break
+            except Exception as e:
+                logger.debug(f"Grocy propagate_remove: {e}")
 
     def get_trash(self) -> list[dict]:
         return list(self._trash)
@@ -515,7 +602,7 @@ class ShoppingSync:
                 logger.debug(f"Grocy trash cleanup: {e}")
         return f"✅ {count} Artikel endgültig gelöscht."
 
-    async def mark_purchased(self, name: str, bap_client=None, grocy_client=None) -> str:
+    async def mark_purchased(self, name: str) -> str:
         async with self._lock:
             item = self._find(name)
             if not item:
@@ -523,6 +610,11 @@ class ShoppingSync:
             item["purchased"] = True
             item["purchased_at"] = _utcnow().isoformat()
             self.save()
+        return f"✅ '{name}' als gekauft markiert."
+
+    def propagate_mark_purchased(self, name: str):
+        bap_client = getattr(self, '_linked_bap', None)
+        grocy_client = getattr(self, '_linked_grocy', None)
         if bap_client:
             try:
                 target_name = config.get("bap_list_name", "Einkaufsliste").lower()
@@ -534,7 +626,7 @@ class ShoppingSync:
                                 break
                         break
             except Exception as e:
-                logger.debug(f"BAP mark purchased: {e}")
+                logger.debug(f"BAP propagate_mark_purchased: {e}")
         if grocy_client:
             try:
                 for gitem in grocy_client.get_shopping_list():
@@ -542,8 +634,7 @@ class ShoppingSync:
                         grocy_client.mark_done(gitem["id"])
                         break
             except Exception as e:
-                logger.debug(f"Grocy mark done: {e}")
-        return f"✅ '{name}' als gekauft markiert."
+                logger.debug(f"Grocy propagate_mark_purchased: {e}")
 
     async def update_quantity(self, name: str, quantity: int) -> str:
         async with self._lock:
@@ -561,6 +652,22 @@ class ShoppingSync:
             removed = before - len(self._synced_items)
             self.save()
             return f"✅ {removed} gekaufte Artikel entfernt."
+
+    async def batch_mark_purchased(self, names: list) -> str:
+        marked = 0
+        for name in names:
+            r = await self.mark_purchased(name)
+            if "✅" in r:
+                marked += 1
+        return f"✅ {marked}/{len(names)} Artikel als gekauft markiert."
+
+    async def batch_remove(self, names: list) -> str:
+        removed = 0
+        for name in names:
+            r = await self.remove_item(name)
+            if "✅" in r:
+                removed += 1
+        return f"✅ {removed}/{len(names)} Artikel in den Papierkorb verschoben."
 
     def get_merged_text(self) -> str:
         active = [i for i in self._synced_items if not i.get("purchased") and not self._is_removed(i.get("name", ""))]

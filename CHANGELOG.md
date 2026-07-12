@@ -4,6 +4,57 @@ All changes to Grot2Buy with explanations.
 
 ---
 
+## [0.15.0] — 2026-07-12
+
+### 🔒 Security Audit Batch 2–5 (25 Findings) + v0.14 Fixes
+
+**30 Security Findings in 5 Batches — alle behoben (v24–v27).**
+
+#### Batch 2 (v24) — Credential-Leak + CORS + Reset-Safety + Token-Expiry
+- 🔴 API-Credentials nicht mehr im Log (user/pass/url entfernt)
+- 🔴 CORS: `allow_origins=[]` + `allow_credentials=False`
+- 🔴 Reset mit Backup vor dem Leeren der Sync-Daten
+- 🔴 Share-Tokens: 30-Tage-Expiry + automatische Bereinigung
+- 🔴 Max 200 Zeichen für Item-Namen
+
+#### Batch 3 (v25) — XSS-Prävention + Config-Sicherheit + Rate-Limiting
+- 🔴 Stored DOM XSS: `onclick` durch Event-Delegation ersetzt (BAP-List-ID)
+- 🟠 Config-Import: Credential-Keys blockiert (password, bap_user, bap_pass, grocy_url, grocy_key)
+- 🟠 Docs innerHTML: sanitize via DOM-Parser + Entfernung von script/style/iframe/on*
+- 🟡 Bulk-Add: auf 100 Items begrenzt
+- 🟡 Login Rate-Limiter: X-Forwarded-For/X-Real-IP Support, Dict-Cap 10k
+
+#### Batch 4 (v26) — Encryption + SSRF-Schutz + Token-Offenlegung
+- 🔴 Share-Tokens: Fernet-verschlüsselt auf Disk
+- 🔴 SSRF: URL-Validation mit Blocklist für loopback/private/link-local
+- 🟠 Token-Offenlegung: Token aus API-Response/DOM entfernt, Revoke via UID, Event-Delegation
+- 🟠 DOM-XSS in showTrash: escapeHtml für Fehlermeldung
+- 🟡 Mengenvalidierung: quantity 1-999 + Typ-Prüfung (int)
+
+#### Batch 5 (v27) — CSWSH + SSRF-Erweiterung + Info-Leak
+- 🔴 WebSocket: Origin-Validierung gegen Cross-Site WebSocket Hijacking
+- 🟠 SSRF: Blocklist via `ipaddress` (loopback/private/link-local)
+- 🟠 `/health`: Version aus ungeschützter Response entfernt
+- 🟠 Share-Endpunkt: nur öffentliche Felder (name/quantity/category)
+- 🟡 `_atomic_write`: .tmp-Dateien mit 0o600
+
+#### v0.14 Bugfixes
+- `add_item`: Entferntes/purchased Item wird als neuer aktiver Eintrag angelegt (`_find_active()`)
+- WS-Reconnect: `wsReconnectAttempts` wird nach erfolgreicher Verbindung korrekt zurückgesetzt
+- Auto-Sync: Startet jetzt nach dem Daten-Laden im Hintergrund (sofortige Content-Anzeige)
+
+**Version**: `0.14.0` → `0.15.0`
+
+## [0.14.0] — 2026-07-10
+
+### 🚀 Batch-Aktionen, Auto-Vervollständigung & Listen teilen
+
+- **Batch-Aktionen**: Auswahlmodus (Tab "Auswahl") → mehrere Artikel gleichzeitig kaufen oder löschen
+- **Auto-Vervollständigung**: Vorschläge aus Grocy-Produkten + vorhandenen Artikeln beim Tippen im Hinzufügen-Dialog
+- **Listen teilen**: Freigabe-Links erstellen/widerrufen (Einstellungen → "Freigabe-Link"), öffentlicher Read-Only-Zugriff
+- Hilfe-Menü zeigt jetzt Docs-Links (Doku + Changelog)
+- Version 0.13.0 → 0.14.0
+
 ## [0.13.0] — 2026-07-10
 
 ### ⚡ Performance + UI-Optimierung

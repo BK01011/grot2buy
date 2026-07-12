@@ -38,6 +38,7 @@ Grot2Buy is a self-hosted shopping list management application. It synchronizes 
 ### Key Features
 
 - Bidirectional sync (Grocy ↔ BAP ↔ Local)
+- Bidirectional sync (Grocy ↔ BAP ↔ Local) mit **Last writer wins**
 - Automatic background sync (configurable interval)
 - Categorization by EAN prefix
 - Quantity management per item
@@ -46,6 +47,12 @@ Grot2Buy is a self-hosted shopping list management application. It synchronizes 
 - Push notifications on sync errors (desktop via Service Worker)
 - Mobile-optimized user interface
 - HTTPS with self-signed certificate
+- **Batch operations**: Select + buy/delete multiple items
+- **Auto-complete**: Suggestions from Grocy products while typing
+- **Shareable lists**: Create public read-only share links
+- **WebSocket live sync**: Real-time push on sync/CRUD events
+- **Background sync**: Silent refresh without blocking UI
+- **Offline mode**: Service Worker cache + write queue
 
 ---
 
@@ -154,7 +161,7 @@ docker compose logs -f
 curl -k https://localhost:8899/health
 
 # Expected response:
-# {"status":"ok","service":"grot2buy","version":"0.13.0"}
+# {"status":"ok","service":"grot2buy"}
 ```
 
 ### 4. Enable auto-start on system boot
@@ -488,7 +495,7 @@ curl -k -X POST https://localhost:8899/api/synced/reset
 
 ```
 assistant/
-├── main.py                 # FastAPI server (700+ lines)
+├── main.py                 # FastAPI server (1280 lines)
 ├── Dockerfile              # Docker image (37 lines)
 ├── docker-compose.yml      # Docker Compose (20 lines)
 ├── requirements.txt        # Python dependencies
@@ -497,19 +504,19 @@ assistant/
 ├── CHANGELOG.md            # Changelog
 ├── modules/
 │   ├── __init__.py
-│   ├── config.py           # Encrypted config (158 lines)
-│   ├── i18n.py             # Translation engine (70 lines)
-│   ├── buymeapie.py        # BAP API client (178 lines)
-│   ├── shopping.py         # Grocy client + ShoppingManager (150 lines)
-│   └── shopping_sync.py    # Bidirectional sync + Sync API (550+ lines)
+│   ├── config.py           # Encrypted config (200 lines)
+│   ├── i18n.py             # Translation engine (75 lines)
+│   ├── buymeapie.py        # BAP API client (210 lines)
+│   ├── shopping.py         # Grocy client + ShoppingManager (205 lines)
+│   └── shopping_sync.py    # Bidirectional sync + Sync API (755 lines)
 ├── templates/
-│   ├── shopping.html       # Main page (185 lines)
+│   ├── shopping.html       # Main page (310 lines)
 │   ├── setup.html          # Setup wizard
-│   └── login.html          # Login page (32 lines)
+│   └── login.html          # Login page (37 lines)
 ├── static/
 │   ├── sw.js               # Service Worker (with notification support)
-│   ├── app.js              # Frontend logic (530 lines)
-│   ├── style.css           # CSS styles (640 lines)
+│   ├── app.js              # Frontend logic (1150 lines)
+│   ├── style.css           # CSS styles (1090 lines)
 │   └── logo.svg            # App icon
 ├── data/                   # Persistent data (Docker volume)
 │   ├── config.json         # Configuration
@@ -573,8 +580,17 @@ services:
 - Password is hashed with **PBKDF2-SHA256** (600,000 iterations) — no plaintext
 - Auth-Token Cookie: `httponly`, `secure`, `samesite=strict`
 - HTTPS with self-signed certificate
-- CORS allows all origins (for local use)
+- **CORS**: `allow_origins=[]` (no external origins allowed)
 - `/api/config/export` never exposes the `secret.key`
+- **API credentials**: Never logged (redacted from request logs)
+- **SSRF protection**: Grocy URL validated against loopback/private/link-local via `ipaddress` + metadata hostname blocklist
+- **WebSocket Origin validation**: CSWSH protection via Origin header check
+- **Share tokens**: Fernet-encrypted on disk, 30-day expiry, automatic cleanup
+- **DOM XSS protection**: Event delegation instead of inline `onclick`, DOM-Parser sanitization for docs
+- **Rate limiting**: Login endpoint: 5 attempts/5 minutes per IP (with X-Forwarded-For support), Dict cap 10k entries
+- **Input validation**: Item names max 200 chars, quantity 1–999 strict type check, bulk-add max 100 items
+- **Reset safety**: Auto-backup before synced-list reset
+- **Temp files**: `_atomic_write` creates `.tmp` files with `0o600` permissions
 
 ---
 
@@ -617,7 +633,7 @@ Grot2Buy ist eine selbst-gehostete Anwendung zur Verwaltung von Einkaufslisten. 
 
 ### Kernfunktionen
 
-- Bidirektionale Synchronisation (Grocy ↔ BAP ↔ Lokal)
+- Bidirektionale Synchronisation (Grocy ↔ BAP ↔ Lokal) mit **Wer geändert hat gewinnt**
 - Automatische Hintergrund-Synchronisation (konfigurierbares Intervall)
 - Kategorisierung nach EAN-Präfix
 - Mengenverwaltung pro Artikel
@@ -626,6 +642,12 @@ Grot2Buy ist eine selbst-gehostete Anwendung zur Verwaltung von Einkaufslisten. 
 - Push-Benachrichtigungen bei Sync-Fehlern (Desktop via Service Worker)
 - Mobile-optimierte Benutzeroberfläche
 - HTTPS mit selbst-gezeichnetem Zertifikat
+- **Batch-Aktionen**: Auswahl + mehrere Artikel gleichzeitig kaufen/löschen
+- **Auto-Vervollständigung**: Vorschläge aus Grocy-Produkten beim Tippen
+- **Freigabe-Links**: Öffentliche Read-Only-Freigabelinks erstellen
+- **WebSocket Live-Sync**: Echtzeit-Push bei Sync/CRUD-Ereignissen
+- **Hintergrund-Sync**: Stille Aktualisierung ohne UI-Blockade
+- **Offline-Modus**: Service Worker Cache + Write-Queue
 
 ---
 
@@ -734,7 +756,7 @@ docker compose logs -f
 curl -k https://localhost:8899/health
 
 # Erwartete Antwort:
-# {"status":"ok","service":"grot2buy","version":"0.13.0"}
+# {"status":"ok","service":"grot2buy"}
 ```
 
 ### 4. Auto-Start bei Systemstart aktivieren
@@ -1073,7 +1095,7 @@ curl -k -X POST https://localhost:8899/api/synced/reset
 
 ```
 assistant/
-├── main.py                 # FastAPI Server (700+ Zeilen)
+├── main.py                 # FastAPI Server (1280 Zeilen)
 ├── Dockerfile              # Docker Image (37 Zeilen)
 ├── docker-compose.yml      # Docker Compose (20 Zeilen)
 ├── requirements.txt        # Python-Abhängigkeiten
@@ -1082,19 +1104,19 @@ assistant/
 ├── CHANGELOG.md            # Änderungsprotokoll
 ├── modules/
 │   ├── __init__.py
-│   ├── config.py           # Verschlüsselte Konfiguration (158 Zeilen)
-│   ├── i18n.py             # Übersetzungs-Modul (70 Zeilen)
-│   ├── buymeapie.py        # BAP API Client (178 Zeilen)
-│   ├── shopping.py         # Grocy Client + ShoppingManager (150 Zeilen)
-│   └── shopping_sync.py    # Bidirektionale Synchronisation + Sync-API (550+ Zeilen)
+│   ├── config.py           # Verschlüsselte Konfiguration (200 Zeilen)
+│   ├── i18n.py             # Übersetzungs-Modul (75 Zeilen)
+│   ├── buymeapie.py        # BAP API Client (210 Zeilen)
+│   ├── shopping.py         # Grocy Client + ShoppingManager (205 Zeilen)
+│   └── shopping_sync.py    # Bidirektionale Synchronisation + Sync-API (755 Zeilen)
 ├── templates/
-│   ├── shopping.html       # Hauptseite (185 Zeilen)
+│   ├── shopping.html       # Hauptseite (310 Zeilen)
 │   ├── setup.html          # Setup-Wizard
-│   └── login.html          # Login-Seite (32 Zeilen)
+│   └── login.html          # Login-Seite (37 Zeilen)
 ├── static/
 │   ├── sw.js               # Service Worker (mit Benachrichtigungen)
-│   ├── app.js              # Frontend-Logik (530 Zeilen)
-│   ├── style.css           # CSS-Styles (640 Zeilen)
+│   ├── app.js              # Frontend-Logik (1150 Zeilen)
+│   ├── style.css           # CSS-Styles (1090 Zeilen)
 │   └── logo.svg            # App-Icon
 ├── data/                   # Persistente Daten (Docker Volume)
 │   ├── config.json         # Konfiguration
@@ -1158,5 +1180,14 @@ services:
 - Passwort wird mit **PBKDF2-SHA256** (600.000 Iterationen) gehasht — kein Klartext
 - Auth-Token Cookie: `httponly`, `secure`, `samesite=strict`
 - HTTPS mit selbst-gezeichnetem Zertifikat
-- CORS erlaubt alle Origins (für lokale Nutzung)
+- **CORS**: `allow_origins=[]` (keine externen Origins erlaubt)
 - `/api/config/export` gibt **nie** den `secret.key` aus
+- **API-Zugangsdaten**: Niemals geloggt (aus Request-Logs entfernt)
+- **SSRF-Schutz**: Grocy-URL wird gegen Loopback/Private/Link-Local via `ipaddress` + Metadata-Hostname-Blocklist validiert
+- **WebSocket Origin-Validierung**: CSWSH-Schutz via Origin-Header-Prüfung
+- **Share-Tokens**: Fernet-verschlüsselt auf Disk, 30-Tage-Expiry, automatische Bereinigung
+- **DOM-XSS-Schutz**: Event-Delegation statt inline `onclick`, DOM-Parser-Sanitierung für Docs
+- **Rate-Limiting**: Login-Endpunkt: 5 Versuche/5 Minuten pro IP (mit X-Forwarded-For-Unterstützung), Dict-Cap 10k Einträge
+- **Eingabevalidierung**: Item-Namen max. 200 Zeichen, Menge 1–999 strikte Typ-Prüfung, Bulk-Add max. 100 Items
+- **Reset-Sicherheit**: Auto-Backup vor Sync-Liste-Reset
+- **Temp-Dateien**: `_atomic_write` erstellt `.tmp`-Dateien mit `0o600`-Berechtigungen

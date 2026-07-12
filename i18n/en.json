@@ -10,7 +10,12 @@
   },
   "tab": {
     "synced": "Synced",
-    "grocy": "Grocy"
+    "grocy": "Grocy",
+    "select": "Select",
+    "done": "Done",
+    "select_all": "All",
+    "batch_buy": "Buy",
+    "batch_delete": "Delete"
   },
   "loading": {
     "data": "Loading data..."
@@ -56,6 +61,7 @@
     "lang_label": "Language",
     "actions_section": "Actions",
     "export": "Export list",
+    "share": "Share link",
     "clear_purchased": "Clear purchased",
     "docs_section": "Documentation",
     "docs_doku": "View documentation",
@@ -69,6 +75,7 @@
   },
   "item": {
     "remove_confirm": "Remove \"{name}\"?",
+    "remove_confirm_batch": "Move {n} items to trash?",
     "removed": "✅ '{name}' removed.",
     "added": "✅ '{name}' added.",
     "not_found": "❌ '{name}' not found.",
@@ -183,5 +190,16 @@
     "credits_ai": "Created with AI assistance (opencode, Claude)",
     "credits_thanks": "Thanks to: Grocy, Buy Me a Pie",
     "credits_license": "License: MIT — Everyone may use, modify and share."
+  },
+  "share": {
+    "title": "Share shopping list",
+    "description": "Create a share link to share the list with others. The link is read-only.",
+    "create": "Create share link",
+    "active_tokens": "Active shares",
+    "revoke": "Revoke",
+    "revoked": "Share revoked.",
+    "copied": "Share link copied to clipboard.",
+    "no_tokens": "No active shares.",
+    "created": "Share link created."
   }
 }

@@ -38,6 +38,7 @@ def decrypt(token: str) -> str:
 def _atomic_write(path: Path, content: str):
     tmp = path.with_suffix(".tmp")
     tmp.write_text(content, encoding="utf-8")
+    os.chmod(str(tmp), 0o600)
     tmp.replace(path)
 
 

@@ -10,7 +10,12 @@
   },
   "tab": {
     "synced": "Synchronisiert",
-    "grocy": "Grocy"
+    "grocy": "Grocy",
+    "select": "Auswahl",
+    "done": "Fertig",
+    "select_all": "Alle",
+    "batch_buy": "Kaufen",
+    "batch_delete": "Löschen"
   },
   "loading": {
     "data": "Lade Daten..."
@@ -56,6 +61,7 @@
     "lang_label": "Sprache",
     "actions_section": "Aktionen",
     "export": "Liste exportieren",
+    "share": "Freigabe-Link",
     "clear_purchased": "Erledigte löschen",
     "docs_section": "Dokumentation",
     "docs_doku": "Dokumentation anzeigen",
@@ -69,6 +75,7 @@
   },
   "item": {
     "remove_confirm": "\"{name}\" entfernen?",
+    "remove_confirm_batch": "{n} Artikel in den Papierkorb verschieben?",
     "removed": "✅ '{name}' entfernt.",
     "added": "✅ '{name}' hinzugefügt.",
     "not_found": "❌ '{name}' nicht gefunden.",
@@ -184,5 +191,16 @@
     "credits_ai": "Erstellt mit KI-Unterstützung (opencode, Claude)",
     "credits_thanks": "Dank an: Grocy, Buy Me a Pie",
     "credits_license": "Lizenz: MIT — Jeder darf nutzen, verändern und teilen."
+  },
+  "share": {
+    "title": "Einkaufsliste teilen",
+    "description": "Erstelle einen Freigabe-Link, um die Liste mit anderen zu teilen. Der Link ist schreibgeschützt.",
+    "create": "Freigabe-Link erstellen",
+    "active_tokens": "Aktive Freigaben",
+    "revoke": "Widerrufen",
+    "revoked": "Freigabe widerrufen.",
+    "copied": "Freigabe-Link in die Zwischenablage kopiert.",
+    "no_tokens": "Keine aktiven Freigaben.",
+    "created": "Freigabe-Link erstellt."
   }
 }
