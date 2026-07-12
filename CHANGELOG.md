@@ -4,7 +4,7 @@ All changes to Grot2Buy with explanations.
 
 ---
 
-## [0.15.0] — 2026-07-12
+## [0.27.0] — 2026-07-12
 
 ### 🔒 Security Audit Batch 2–5 (25 Findings) + v0.14 Fixes
 
@@ -43,7 +43,7 @@ All changes to Grot2Buy with explanations.
 - WS-Reconnect: `wsReconnectAttempts` wird nach erfolgreicher Verbindung korrekt zurückgesetzt
 - Auto-Sync: Startet jetzt nach dem Daten-Laden im Hintergrund (sofortige Content-Anzeige)
 
-**Version**: `0.14.0` → `0.15.0`
+**Version**: `0.13.0` → `0.27.0`
 
 ## [0.14.0] — 2026-07-10
 

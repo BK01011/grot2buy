@@ -21,7 +21,7 @@ import uuid
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-VERSION = "0.15.0"
+VERSION = "0.27.0"
 
 logging.basicConfig(
     level=logging.INFO,
