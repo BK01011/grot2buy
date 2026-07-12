@@ -1151,6 +1151,7 @@ async function openLogs() {
             .replace(/(\[ERROR\])/g, '<span class="log-error">$1</span>')
             .replace(/(\[WARNING\]|\[WARN\])/g, '<span class="log-warn">$1</span>')
             .replace(/(\[INFO\])/g, '<span class="log-info">$1</span>')
+            .replace(/(^|\s)(DEBUG)(\s|:)/gm, '$1<span class="log-debug">$2</span>$3')
             .replace(/(\[DEBUG\])/g, '<span class="log-debug">$1</span>')
             .replace(/^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})/gm, '<span class="log-time">$1</span>');
         pre.innerHTML = html;

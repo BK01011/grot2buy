@@ -612,7 +612,7 @@ body {
 }
 
 .log-debug {
-    color: var(--text-secondary);
+    color: var(--secondary);
 }
 
 .docs-body h1 {
