@@ -577,6 +577,43 @@ body {
     line-height: 1.6;
 }
 
+.log-viewer {
+    font-size: 0.72rem;
+    line-height: 1.4;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin: 0;
+    font-family: 'Courier New', Courier, monospace;
+    background: #0d1117;
+    color: #e6edf3;
+    padding: 12px;
+    border-radius: 8px;
+}
+
+.log-time {
+    color: #8b949e;
+}
+
+.log-error {
+    color: #f85149;
+    font-weight: 600;
+}
+
+.log-warn {
+    color: #d29922;
+    font-weight: 600;
+}
+
+.log-info {
+    color: #58a6ff;
+    font-weight: 600;
+}
+
+.log-debug {
+    color: #6e7681;
+}
+
 .docs-body h1 {
     font-size: 1.2rem;
     margin: 0 0 12px;

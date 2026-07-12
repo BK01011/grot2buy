@@ -1145,8 +1145,15 @@ async function openLogs() {
         const container = document.getElementById('docsBody');
         container.textContent = '';
         const pre = document.createElement('pre');
-        pre.style.cssText = 'font-size:0.75rem;line-height:1.4;overflow-x:auto;white-space:pre-wrap;word-break:break-all;margin:0;';
-        pre.textContent = data.logs || __('item.not_found').replace('{name}', __('settings.docs_logs'));
+        pre.className = 'log-viewer';
+        let html = escapeHtml(data.logs || '');
+        html = html
+            .replace(/(\[ERROR\])/g, '<span class="log-error">$1</span>')
+            .replace(/(\[WARNING\]|\[WARN\])/g, '<span class="log-warn">$1</span>')
+            .replace(/(\[INFO\])/g, '<span class="log-info">$1</span>')
+            .replace(/(\[DEBUG\])/g, '<span class="log-debug">$1</span>')
+            .replace(/^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})/gm, '<span class="log-time">$1</span>');
+        pre.innerHTML = html;
         container.appendChild(pre);
         document.getElementById('docsModal').classList.add('open');
     } catch (e) {
