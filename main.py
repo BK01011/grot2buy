@@ -1156,8 +1156,23 @@ async def websocket_endpoint(websocket: WebSocket):
     origin = websocket.headers.get("origin", "")
     if origin:
         from urllib.parse import urlparse
-        o = urlparse(origin)
-        if o.hostname not in {"localhost", "127.0.0.1", "192.168.178.51", "shopping-list"}:
+        try:
+            import ipaddress
+            o = urlparse(origin)
+            host = o.hostname or ""
+            if host.startswith("["):
+                host = host.strip("[]")
+            allowed = {"localhost", "127.0.0.1", "::1", "shopping-list"}
+            if host not in allowed:
+                try:
+                    addr = ipaddress.ip_address(host)
+                    if not addr.is_private:
+                        await websocket.close(code=1008)
+                        return
+                except ValueError:
+                    await websocket.close(code=1008)
+                    return
+        except Exception:
             await websocket.close(code=1008)
             return
     has_password = bool(config.get_decrypted("password", ""))
