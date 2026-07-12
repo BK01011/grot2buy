@@ -118,4 +118,4 @@ alphabetisch sortiert, category-header)
 4. 🟠 Share-Endpunkt — nur öffentliche Felder (name/quantity/category) (main.py:623-628)
 5. 🟡 `_atomic_write` — .tmp-Dateien mit 0o600 (config.py:38-41, shopping_sync.py:21-24)
 
-Autor: S.B. | Lizenz: MIT | Erstellt mit KI-Unterstützung (opencode, Claude)
+Autor: S.B. | Lizenz: MIT

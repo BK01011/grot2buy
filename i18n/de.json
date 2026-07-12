@@ -66,7 +66,9 @@
     "docs_section": "Dokumentation",
     "docs_doku": "Dokumentation anzeigen",
     "docs_changelog": "Changelog anzeigen",
+    "docs_logs": "Logs anzeigen",
     "error_load_docs": "Fehler beim Laden der Dokumentation",
+    "error_load_logs": "Fehler beim Laden der Logs",
     "appearance_section": "Darstellung",
     "darkmode_label": "Dark Mode",
     "darkmode_auto": "Automatisch",
@@ -188,7 +190,6 @@
 
     "credits_title": "Danksagung",
     "credits_author": "Autor: S.B.",
-    "credits_ai": "Erstellt mit KI-Unterstützung (opencode, Claude)",
     "credits_thanks": "Dank an: Grocy, Buy Me a Pie",
     "credits_license": "Lizenz: MIT — Jeder darf nutzen, verändern und teilen."
   },

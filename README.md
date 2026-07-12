@@ -102,14 +102,8 @@ Full API documentation: [DOKU.md](DOKU.md)
 
 ---
 
-## AI Assistance
-
-This tool was created with AI assistance.
-
 ### Thanks to
 
-- **[opencode](https://opencode.ai)** – AI-powered development environment
-- **Claude** (Anthropic) – Code generation & architecture guidance
 - **Grocy** ([grocy.info](https://grocy.info)) – Household ERP system
 - **Buy Me a Pie** ([buymeapie.com](https://buymeapie.com)) – The mobile shopping list
 
@@ -231,8 +225,6 @@ Dieses Tool wurde mit Unterstützung von KI erstellt.
 
 ### Dank an
 
-- **[opencode](https://opencode.ai)** – KI-gestützte Entwicklungsumgebung
-- **Claude** (Anthropic) – Code-Generierung und Architekturberatung
 - **Grocy** ([grocy.info](https://grocy.info)) – ERP-System für den Haushalt
 - **Buy Me a Pie** ([buymeapie.com](https://buymeapie.com)) – Der mobile Einkaufszettel
 

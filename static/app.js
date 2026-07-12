@@ -1137,6 +1137,24 @@ async function openDocs(type) {
     }
 }
 
+async function openLogs() {
+    try {
+        const data = await api('/logs');
+        if (!data || data.logs === undefined) throw new Error('empty response');
+        document.getElementById('docsModalTitle').textContent = __('settings.docs_logs');
+        const container = document.getElementById('docsBody');
+        container.textContent = '';
+        const pre = document.createElement('pre');
+        pre.style.cssText = 'font-size:0.75rem;line-height:1.4;overflow-x:auto;white-space:pre-wrap;word-break:break-all;margin:0;';
+        pre.textContent = data.logs || __('item.not_found').replace('{name}', __('settings.docs_logs'));
+        container.appendChild(pre);
+        document.getElementById('docsModal').classList.add('open');
+    } catch (e) {
+        console.error('Logs fetch error:', e);
+        toast(__('settings.error_load_logs') + ' (' + e.message + ')');
+    }
+}
+
 // Enter zum Hinzufügen
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && document.getElementById('addModal').classList.contains('open')) {

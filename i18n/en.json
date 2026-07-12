@@ -66,7 +66,9 @@
     "docs_section": "Documentation",
     "docs_doku": "View documentation",
     "docs_changelog": "View changelog",
+    "docs_logs": "View logs",
     "error_load_docs": "Failed to load documentation",
+    "error_load_logs": "Failed to load logs",
     "appearance_section": "Appearance",
     "darkmode_label": "Dark Mode",
     "darkmode_auto": "Auto",
@@ -187,7 +189,6 @@
     "usage_pwa": "📲 PWA: Close app (swipe from homescreen) and reopen after update",
     "credits_title": "Acknowledgements",
     "credits_author": "Author: S.B.",
-    "credits_ai": "Created with AI assistance (opencode, Claude)",
     "credits_thanks": "Thanks to: Grocy, Buy Me a Pie",
     "credits_license": "License: MIT — Everyone may use, modify and share."
   },

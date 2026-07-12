@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Grot2Buy</title>
-    <link rel="stylesheet" href="/static/style.css?v=20">
+    <link rel="stylesheet" href="/static/style.css?v=22">
     <link rel="icon" href="/static/logo.svg?v=20" type="image/svg+xml">
     <link rel="manifest" href="/static/manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -254,7 +254,6 @@
                 <div class="help-section">
                     <h3>{{ t("help.credits_title") }}</h3>
                     <p>{{ t("help.credits_author") }}</p>
-                    <p>{{ t("help.credits_ai") }}</p>
                     <p>{{ t("help.credits_thanks") }}</p>
                     <p class="help-license">{{ t("help.credits_license") }}</p>
                 </div>
@@ -262,6 +261,7 @@
                     <h3>{{ t("settings.docs_section") }}</h3>
                     <button class="btn btn-secondary full-width" onclick="closeModal('helpModal');openDocs('doku')">{{ t("settings.docs_doku") }}</button>
                     <button class="btn btn-secondary full-width" onclick="closeModal('helpModal');openDocs('changelog')">{{ t("settings.docs_changelog") }}</button>
+                    <button class="btn btn-secondary full-width" onclick="closeModal('helpModal');openLogs()">{{ t("settings.docs_logs") }}</button>
                 </div>
             </div>
         </div>
@@ -288,7 +288,7 @@
     </div>
 
     <!-- Docs Modal -->
-    <div class="modal" id="docsModal">
+    <div class="modal" id="docsModal" onclick="if(event.target===this)closeModal('docsModal')">
         <div class="modal-content docs-modal">
             <div class="modal-header">
                 <h2 id="docsModalTitle">{{ t("settings.docs_section") }}</h2>
@@ -302,7 +302,7 @@
     <div class="toast" id="toast"></div>
 
     <script>window._t = {{ t_flat | tojson }};</script>
-    <script src="/static/app.js?v=20"></script>
-    <script>if('serviceWorker'in navigator){navigator.serviceWorker.register('/static/sw.js?v=21').then(r=>r.update())}</script>
+    <script src="/static/app.js?v=22"></script>
+    <script>if('serviceWorker'in navigator){navigator.serviceWorker.register('/static/sw.js?v=22').then(r=>r.update())}</script>
 </body>
 </html>

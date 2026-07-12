@@ -3,8 +3,8 @@
 **EN** — Bidirectional synchronization between Buy Me a Pie, Grocy and local shopping list
 **DE** — Bidirektionale Synchronisation zwischen Buy Me a Pie, Grocy und lokaler Liste
 
-Author: **S.B.** | License: MIT | Created with AI assistance
-Thanks to: Grocy, Buy Me a Pie, opencode, Claude
+Author: **S.B.** | License: MIT
+Thanks to: Grocy, Buy Me a Pie
 
 ---
 
@@ -600,8 +600,8 @@ services:
 
 **Bidirektionale Synchronisation zwischen Buy Me a Pie, Grocy und lokaler Liste**
 
-Autor: **S.B.** | Lizenz: MIT | Erstellt mit KI-Unterstützung
-Dank an: Grocy, Buy Me a Pie, opencode, Claude
+Autor: **S.B.** | Lizenz: MIT
+Dank an: Grocy, Buy Me a Pie
 
 ---
 

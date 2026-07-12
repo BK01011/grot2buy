@@ -1,9 +1,7 @@
 """Grot2Buy — Bidirektionale Einkaufslisten-Synchronisation.
 
 Buy Me a Pie ↔ Grocy ↔ Lokale Liste.
-Autor: S.B.
-Lizenz: MIT
-Erstellt mit KI-Unterstützung (opencode, Claude).
+Autor: S.B. — Lizenz: MIT
 """
 import json
 import re
@@ -23,12 +21,17 @@ from fastapi import WebSocket, WebSocketDisconnect
 
 VERSION = "0.27.0"
 
+BASE_DIR = Path(__file__).parent
+LOG_FILE = BASE_DIR / "data" / "app.log"
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 logger = logging.getLogger("shopping")
+_file_handler = logging.FileHandler(str(LOG_FILE), encoding="utf-8")
+_file_handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s', '%Y-%m-%d %H:%M:%S'))
+logger.addHandler(_file_handler)
 
 from fastapi import FastAPI, Request, Form, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -44,7 +47,6 @@ from modules.shopping_sync import shopping_sync
 from modules.buymeapie import BuyMeAPieClient
 from modules.i18n import t as i18n_t, flattened as i18n_flat, AVAILABLE_LANGUAGES, reload as reload_i18n
 
-BASE_DIR = Path(__file__).parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 
@@ -1271,6 +1273,37 @@ async def get_changelog(_: bool = Depends(verify_token)):
         return {"title": "Changelog", "html": _md_to_html(content)}
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
+
+
+def _read_last_n_lines(filepath: str, n: int = 200) -> str:
+    """Liest die letzten n Zeilen einer Datei, sicher und speichereffizient."""
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            from collections import deque
+            lines = deque(f, maxlen=n)
+        return "".join(lines)
+    except Exception:
+        return ""
+
+
+# Zu filternde Patterns (Credentials, Tokens)
+_LOG_SANITIZE_PATTERNS = [
+    (re.compile(r'(?i)(password|passwd|pwd|api_key|apikey|token|secret|auth)\s*[:=]\s*\S+'), r'\1=***'),
+    (re.compile(r'(?i)(bap_pass|bap_user|grocy_key|grocy_url)\s*[:=]\s*\S+'), r'\1=***'),
+    (re.compile(r'Authorization:\s*\S+'), 'Authorization: ***'),
+    (re.compile(r'Bearer\s+\S+'), 'Bearer ***'),
+]
+
+
+@app.get("/api/logs", tags=["Docs"])
+async def get_logs(lines: int = 200, _: bool = Depends(verify_token)):
+    """Gibt die letzten N Zeilen des Logs zurück (gesäubert)."""
+    max_lines = min(max(lines, 10), 500)
+    raw = _read_last_n_lines(str(LOG_FILE), max_lines)
+    sanitized = raw
+    for pattern, replacement in _LOG_SANITIZE_PATTERNS:
+        sanitized = pattern.sub(replacement, sanitized)
+    return {"logs": sanitized, "lines": max_lines}
 
 
 if __name__ == "__main__":
